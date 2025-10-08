@@ -1,6 +1,5 @@
-use core::{alloc::{GlobalAlloc, Layout}, any::Any, cell::UnsafeCell, mem::MaybeUninit, ptr::{null, null_mut, NonNull}};
+use core::{alloc::{GlobalAlloc, Layout}, cell::UnsafeCell, mem::MaybeUninit, ptr::null_mut};
 extern crate alloc;
-use alloc::boxed::Box;
 struct LPAllocator {
     allocated : usize,
     free_ptr : UnsafeCell<*mut BlockHeader>,
@@ -18,12 +17,12 @@ impl BlockHeader {
     unsafe fn get_value<T>(this : *mut Self) -> * mut T {
         (this as * const BlockHeader as usize + core::mem::size_of::<BlockHeader>()) as * mut T
     }
-    const unsafe fn init_header_value(this : *mut Self, size : usize, vtable : *mut u8, prev : * mut BlockHeader, next : * mut BlockHeader) {
+    const unsafe fn init_header_value(this : *mut Self, size : usize, vtable : *mut u8, prev : * mut BlockHeader, next : * mut BlockHeader) { unsafe {
         (*this).size = size;
         (*this).vtable = vtable;
         (*this).prev = prev;
         (*this).next = next;
-    }
+    }}
 }
 
 struct FreeBlock {
