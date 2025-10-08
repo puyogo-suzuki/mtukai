@@ -1,14 +1,6 @@
-//! Counts a 32 bit value at a known point in memory, and blink GPIO1.
-//!
-//! When using the ESP32-C6's LP core, this address in memory is `0x5000_2000`.
-//!
-//! When using the ESP32-S2 or ESP32-S3's ULP core, this address in memory is
-//! `0x5000_0400` (but is `0x400`` from the ULP's point of view!).
-//!
-//! Make sure the LP RAM is cleared before loading the code.
-
 #![no_std]
 #![no_main]
+#![feature(alloc_error_handler)]
 
 pub mod lpalloc;
 

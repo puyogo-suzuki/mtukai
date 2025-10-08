@@ -103,4 +103,9 @@ unsafe impl<const SIZE: usize> GlobalAlloc for LPAllocator<SIZE> {
     // or rely on their default implementations. For brevity, we'll use defaults.
 }
 
+#[alloc_error_handler]
+fn ignore_alloc_error(_: core::alloc::Layout) -> ! {
+    loop{}
+}
+
 unsafe impl<const SIZE: usize> Sync for LPAllocator<SIZE> {}
