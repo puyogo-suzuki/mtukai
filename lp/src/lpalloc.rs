@@ -1,9 +1,9 @@
 use core::{alloc::{GlobalAlloc, Layout}, cell::UnsafeCell, mem::MaybeUninit, ptr::null_mut};
 extern crate alloc;
-struct LPAllocator {
+pub struct LPAllocator<const SIZE: usize> {
     allocated : usize,
     free_ptr : UnsafeCell<*mut BlockHeader>,
-    heap : [MaybeUninit<u8>; 1024 * 4]
+    heap : [MaybeUninit<u8>; SIZE]
 }
 
 struct BlockHeader {
@@ -29,22 +29,22 @@ struct FreeBlock {
     next: * mut BlockHeader,
 }
 
-impl LPAllocator {
-    const fn new() -> Self { unsafe {
-        let mut ret = LPAllocator { allocated: 0, free_ptr: UnsafeCell::new(null_mut()), heap : [MaybeUninit::uninit(); 1024 * 4] };
+impl<const SIZE: usize> LPAllocator<SIZE> {
+    pub const fn new() -> Self { unsafe {
+        let mut ret = LPAllocator { allocated: 0, free_ptr: UnsafeCell::new(null_mut()), heap : [MaybeUninit::uninit(); SIZE] };
         let bh : * mut BlockHeader = ret.heap.as_mut_ptr().cast();
-        BlockHeader::init_header_value(bh, 1024 * 4, null_mut(), null_mut(), null_mut());
+        BlockHeader::init_header_value(bh, SIZE, null_mut(), null_mut(), null_mut());
         let fb : * mut FreeBlock = ret.heap.as_mut_ptr().byte_add(core::mem::size_of::<BlockHeader>()) as * mut FreeBlock;
         (*fb).next = null_mut();
         ret
     }}
 
-    fn init(&self) {
+    pub fn init(&self) {
         unsafe{self.free_ptr.get().write(self.heap.as_ptr() as * mut BlockHeader);}
     }
 }
 
-unsafe impl GlobalAlloc for LPAllocator {
+unsafe impl<const SIZE: usize> GlobalAlloc for LPAllocator<SIZE> {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 { unsafe{
         let layout = layout.align_to(core::mem::align_of::<FreeBlock>()).unwrap().pad_to_align();
         let total_size = layout.size() + core::mem::size_of::<BlockHeader>();
@@ -103,7 +103,4 @@ unsafe impl GlobalAlloc for LPAllocator {
     // or rely on their default implementations. For brevity, we'll use defaults.
 }
 
-unsafe impl Sync for LPAllocator {}
-
-#[global_allocator]
-static ALLOCATOR: LPAllocator = LPAllocator::new();
+unsafe impl<const SIZE: usize> Sync for LPAllocator<SIZE> {}

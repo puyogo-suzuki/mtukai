@@ -10,12 +10,16 @@
 #![no_std]
 #![no_main]
 
+pub mod lpalloc;
+
 use embedded_hal::{delay::DelayNs, digital::OutputPin};
 use esp_lp_hal::{delay::Delay, gpio::Output, prelude::*};
 
 use panic_halt as _;
 
-pub mod alloc;
+use lpalloc::LPAllocator;
+#[global_allocator]
+static ALLOCATOR: LPAllocator<4096> = LPAllocator::new();
 
 const ADDRESS: u32 = 0x5000_2000;
 
