@@ -1,4 +1,5 @@
-use std::{env, error::Error, fs, path::PathBuf};
+use std::{error::Error};
+// use std::{env, error::Error, fs, path::PathBuf};
 
 // use esp_metadata_generated::Chip;
 
