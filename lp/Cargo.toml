@@ -1,0 +1,11 @@
+[package]
+name = "esp-rs-copro-lp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+esp-lp-hal = { version = "0.2.0", features = ["esp32c6"]}
+
+embedded-hal      = { version = "1.0.0" }
+cfg-if = "1.0.3"
+panic-halt = "0.2.0"
