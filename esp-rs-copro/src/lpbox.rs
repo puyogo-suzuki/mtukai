@@ -1,6 +1,6 @@
 use core::{any::Any, arch::asm, mem, ptr::{null, NonNull}};
 use alloc::boxed::Box;
-use esp_rs_copro::MovableObject;
+use crate::MovableObject;
 
 use crate::lpalloc;
 extern crate alloc;

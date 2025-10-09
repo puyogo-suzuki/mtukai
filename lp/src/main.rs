@@ -2,16 +2,17 @@
 #![no_main]
 #![feature(alloc_error_handler)]
 
-pub mod lpalloc;
-pub mod lpbox;
-
 use embedded_hal::{delay::DelayNs, digital::OutputPin};
 use esp_lp_hal::{delay::Delay, gpio::Output, prelude::*};
 use panic_halt as _;
 
-use lpalloc::LPAllocator;
+use esp_rs_copro::lpalloc::LPAllocator;
 #[global_allocator]
 static ALLOCATOR: LPAllocator<4096> = LPAllocator::new();
+#[alloc_error_handler]
+fn ignore_alloc_error(_: core::alloc::Layout) -> ! {
+    loop{}
+}
 
 const ADDRESS: u32 = 0x5000_2000;
 
