@@ -25,6 +25,13 @@ impl BlockHeader {
     }}
 }
 
+pub unsafe fn write_vtable(ptr: * mut u8, vtable: * mut u8) {
+    let header = (ptr as usize - core::mem::size_of::<BlockHeader>()) as * mut BlockHeader;
+    unsafe {
+        (*header).vtable = vtable;
+    }
+}
+
 struct FreeBlock {
     next: * mut BlockHeader,
 }

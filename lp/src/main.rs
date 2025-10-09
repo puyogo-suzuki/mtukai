@@ -3,10 +3,10 @@
 #![feature(alloc_error_handler)]
 
 pub mod lpalloc;
+pub mod lpbox;
 
 use embedded_hal::{delay::DelayNs, digital::OutputPin};
 use esp_lp_hal::{delay::Delay, gpio::Output, prelude::*};
-
 use panic_halt as _;
 
 use lpalloc::LPAllocator;
@@ -25,6 +25,7 @@ const ADDRESS: u32 = 0x5000_2000;
 
 #[entry]
 fn main(mut gpio1: Output<6>) -> ! {
+    ALLOCATOR.init();
     let mut i: u32 = 0;
 
     let ptr = ADDRESS as *mut u32;

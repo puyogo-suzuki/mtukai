@@ -9,3 +9,8 @@ esp-lp-hal = { version = "0.2.0", features = ["esp32c6"]}
 embedded-hal      = { version = "1.0.0" }
 cfg-if = "1.0.3"
 panic-halt = "0.2.0"
+
+esp-rs-copro = { path = "../esp-rs-copro" }
+
+[profile.dev]
+opt-level = 's'
