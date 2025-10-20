@@ -6,6 +6,24 @@ pub struct LPAllocator<const SIZE: usize> {
     heap : [MaybeUninit<u8>; SIZE]
 }
 
+pub trait LPAlloc {
+    unsafe fn alloc_on_lp(&self, layout : Layout) -> * mut u8;
+    fn init(&mut self);
+}
+
+impl<const SIZE : usize> LPAlloc for LPAllocator<SIZE> {
+    unsafe fn alloc_on_lp(&self, layout : Layout) -> * mut u8 {
+        unsafe {self.alloc(layout)}
+    }
+    fn init(&mut self) { unsafe{
+        let bh : * mut BlockHeader = self.heap.as_mut_ptr().cast();
+        BlockHeader::init_header_value(bh, SIZE, null_mut(), null_mut(), null_mut());
+        let fb : * mut FreeBlock = self.heap.as_mut_ptr().byte_add(core::mem::size_of::<BlockHeader>()) as * mut FreeBlock;
+        (*fb).next = null_mut();
+        self.free_ptr.get().write(self.heap.as_ptr() as * mut BlockHeader);
+    }}
+}
+
 struct BlockHeader {
     next: * mut BlockHeader,
     vtable: * mut u8,
@@ -37,18 +55,7 @@ struct FreeBlock {
 }
 
 impl<const SIZE: usize> LPAllocator<SIZE> {
-    pub const fn new() -> Self { unsafe {
-        let mut ret = LPAllocator { allocated: 0, free_ptr: UnsafeCell::new(null_mut()), heap : [MaybeUninit::uninit(); SIZE] };
-        let bh : * mut BlockHeader = ret.heap.as_mut_ptr().cast();
-        BlockHeader::init_header_value(bh, SIZE, null_mut(), null_mut(), null_mut());
-        let fb : * mut FreeBlock = ret.heap.as_mut_ptr().byte_add(core::mem::size_of::<BlockHeader>()) as * mut FreeBlock;
-        (*fb).next = null_mut();
-        ret
-    }}
-
-    pub fn init(&self) {
-        unsafe{self.free_ptr.get().write(self.heap.as_ptr() as * mut BlockHeader);}
-    }
+    pub const fn new() -> Self { LPAllocator { allocated: 0, free_ptr: UnsafeCell::new(null_mut()), heap : [MaybeUninit::uninit(); SIZE] } }
 }
 
 unsafe impl<const SIZE: usize> GlobalAlloc for LPAllocator<SIZE> {
@@ -56,7 +63,7 @@ unsafe impl<const SIZE: usize> GlobalAlloc for LPAllocator<SIZE> {
         let layout = layout.align_to(core::mem::align_of::<FreeBlock>()).unwrap().pad_to_align();
         let total_size = layout.size() + core::mem::size_of::<BlockHeader>();
         let mut current_ptr : *mut *mut BlockHeader = &self.free_ptr as * const _ as * mut * mut BlockHeader;
-        let mut current = *current_ptr ;
+        let mut current = *current_ptr;
         while !current.is_null() {
             let fb = BlockHeader::get_value::<FreeBlock>(current);
             if (*current).size < total_size {
