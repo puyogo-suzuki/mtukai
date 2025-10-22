@@ -1,11 +1,11 @@
 [package]
 edition      = "2021"
-name         = "esp-rs-copro"
+name         = "esp-rs-copro-main"
 rust-version = "1.86"
 version      = "0.1.0"
 
 [[bin]]
-name = "esp-rs-copro"
+name = "esp-rs-copro-main"
 path = "./src/bin/main.rs"
 
 [dependencies]
@@ -17,9 +17,11 @@ esp-backtrace = { version="0.17.0", features = [
 ] }
 esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32c6"] }
 esp-hal                = { version = "=1.0.0-rc.0", features = ["esp32c6", "unstable", "log-04"] }
+esp-rs-copro           = { path = "../esp-rs-copro" }
+esp-rs-copro-procmacro = { path = "../esp-rs-copro-procmacro" , features = ["has-lp-core"] }
 
 critical-section = "1.2.0"
-
+esp-alloc = { version = "0.9.0", features = ["esp32c6"] }
 
 [profile.dev]
 # Rust debug is too slow.
