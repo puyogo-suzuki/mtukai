@@ -1,5 +1,4 @@
 use core::{alloc::{GlobalAlloc, Layout}, cell::UnsafeCell, mem::MaybeUninit, ptr::null_mut};
-extern crate alloc;
 pub struct LPAllocator<const SIZE: usize> {
     allocated : usize,
     free_ptr : UnsafeCell<*mut BlockHeader>,
