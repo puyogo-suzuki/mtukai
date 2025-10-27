@@ -8,6 +8,7 @@ pub struct LPAllocator<const SIZE: usize> {
 pub trait LPAlloc {
     unsafe fn alloc_on_lp(&self, layout : Layout) -> * mut u8;
     fn init(&mut self);
+    fn check_initialized(&self) -> bool;
 }
 
 impl<const SIZE : usize> LPAlloc for LPAllocator<SIZE> {
@@ -21,8 +22,13 @@ impl<const SIZE : usize> LPAlloc for LPAllocator<SIZE> {
         (*fb).next = null_mut();
         self.free_ptr.get().write(self.heap.as_ptr() as * mut BlockHeader);
     }}
+    fn check_initialized(&self) -> bool {
+        #[allow(useless_ptr_null_checks)]
+        {
+            !(self.free_ptr.get() as *mut u8).is_null()
+        }
+    }
 }
-
 struct BlockHeader {
     next: * mut BlockHeader,
     vtable: * mut u8,
