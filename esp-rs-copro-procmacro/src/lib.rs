@@ -3,6 +3,43 @@
 #[allow(unused)]
 use proc_macro::TokenStream;
 use quote::quote;
+use syn::LitInt;
+
+#[proc_macro]
+pub fn esp_rs_copro_statics(_attr: TokenStream) -> TokenStream {
+    use syn::{parse::Error, Ident};
+    use proc_macro::Span;
+    use proc_macro2::Literal;
+    use proc_macro_crate::{FoundCrate, crate_name};
+    let copro_crate = if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-rs-copro") {
+        let ident = Ident::new(name, Span::call_site().into());
+        quote!{#ident}
+    } else { quote!{crate} };
+    
+    let heap_size = if _attr.is_empty() {4*1024} else {match syn::parse::<LitInt>(_attr).and_then(|v| {v.base10_parse::<usize>()}) {
+        Ok(size) => size,
+        Err(e) => return Error::new(Span::call_site().into(), "The argument must be an integer.").to_compile_error().into(),
+    }};
+    let export_name = format!("__COPRO_ALLOCATOR_{}", heap_size);
+    let export_name_lit = Literal::string(&export_name);
+    let expanded = quote! {
+        #[global_allocator]
+        #[used]
+        #[unsafe(export_name=#export_name_lit)]
+        static mut ALLOCATOR: #copro_crate::lpalloc::LPAllocator<#heap_size> = #copro_crate::lpalloc::LPAllocator::new();
+        #[unsafe(export_name="__COPRO_TRANSFER")]
+        static mut TRANSFER : *mut u8 = 0 as * mut u8;
+        fn get_transfer<T : #copro_crate::MovableObject>() -> Option<&'static mut T> {
+            use #copro_crate::lpalloc::LPAlloc;
+            if(unsafe{ALLOCATOR.check_initialized()}) {
+                Some(unsafe { &mut *(TRANSFER as * mut T) })
+            } else {
+                None
+            }
+        }
+    };
+    expanded.into()
+}
 
 /// Load code to be run on the LP/ULP core.
 ///
@@ -11,8 +48,7 @@ use quote::quote;
 /// let lp_core_code = load_lp_code!("path.elf");
 /// lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_pin);
 /// ```
-
-// #[cfg(any(feature = "has-lp-core", feature = "has-ulp-core"))]
+#[cfg(any(feature = "has-lp-core", feature = "has-ulp-core", test))]
 #[proc_macro]
 pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     use std::{fs, path::Path};
@@ -28,13 +64,18 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     } else {
         crate_name("esp-hal")
     };
-
+    
     let hal_crate = if let Ok(FoundCrate::Name(ref name)) = hal_crate {
         let ident = Ident::new(name, Span::call_site().into());
         quote!( #ident )
     } else {
         quote!(crate)
     };
+    
+    let copro_crate_use = if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-rs-copro") {
+        let ident = Ident::new(name, Span::call_site().into());
+        quote!{use #ident ::lpalloc::LPAllocator}
+    } else { quote!{} };
 
     let lit: LitStr = match syn::parse(input) {
         Ok(lit) => lit,
@@ -122,12 +163,14 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         use #hal_crate::gpio::*;
         use #hal_crate::uart::lp_uart::LpUart;
         use #hal_crate::i2c::lp_i2c::LpI2c;
+        #copro_crate_use;
     };
     #[cfg(feature = "has-ulp-core")]
     let imports = quote! {
         use #hal_crate::ulp_core::UlpCore as LpCore;
         use #hal_crate::ulp_core::UlpCoreWakeupSource as LpCoreWakeupSource;
         use #hal_crate::gpio::*;
+        #copro_crate_use;
     };
 
     #[cfg(feature = "has-lp-core")]
@@ -135,17 +178,23 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     #[cfg(feature = "has-ulp-core")]
     let rtc_code_start = quote! { _rtc_slow_data_start };
 
-    let allocaddr = obj_file.symbols().filter(|s| s.name() == Ok("ALLOCATOR")).next().map(|s| s.address());
-    let allocfun = if let Some(allocaddr) = allocaddr {
+    let transfer = if let Some(a) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_TRANSFER")).map(|s| s.address()) {
+        quote!{unsafe{((#a) as *mut *mut u8).write_volatile(transfer_value.move_to_lp(& *all));}}
+    } else { quote! {}};
+    let allocsym = obj_file.symbols().find(|s| s.name().map_or(false, |v| v.starts_with("__COPRO_ALLOCATOR_")));
+    let allocfun = if let Some(a) = allocsym {
+        let addr = a.address();
+        let size = a.name().ok().and_then(|v| v["__COPRO_ALLOCATOR_".len()..].parse::<usize>().ok());
         quote!{
-            pub fn get_allocator(&self) -> *mut LPAllocator {
-                #allocaddr as *mut LPAllocator
+            pub fn get_allocator() -> *mut LPAllocator<#size> {
+                #addr as *mut LPAllocator<#size>
             }
         }
     } else {quote!{}};
-    let alloccall = if allocaddr.is_some() {quote!{
+    let alloccall = if !allocfun.is_empty() {quote!{
         let all = LpCoreCode::get_allocator();
-        all.init();
+        unsafe{all.as_mut().unwrap().init()};
+        #transfer
     }} else {quote!{}};
     
     quote! {
@@ -165,10 +214,11 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
             }
 
             impl LpCoreCode {
-                pub fn run(
+                pub fn run<T : MovableObject>(
                     &self,
                     lp_core: &mut LpCore,
                     wakeup_source: LpCoreWakeupSource,
+                    transfer_value : &mut T,
                     #(_: #args),*
                 ) {
                     #alloccall

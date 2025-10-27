@@ -4,11 +4,10 @@
 
 use embedded_hal::{delay::DelayNs, digital::OutputPin};
 use esp_lp_hal::{delay::Delay, gpio::Output, prelude::*};
+use esp_rs_copro::TestList;
 use panic_halt as _;
 
-use esp_rs_copro::lpalloc::LPAllocator;
-#[global_allocator]
-static ALLOCATOR: LPAllocator<4096> = LPAllocator::new();
+esp_rs_copro_procmacro::esp_rs_copro_statics!(4096);
 #[alloc_error_handler]
 fn ignore_alloc_error(_: core::alloc::Layout) -> ! {
     loop{}
@@ -24,17 +23,28 @@ const ADDRESS: u32 = 0x5000_2000;
 //     }
 // }
 
+fn sum_testlist(testlist : &TestList) -> i32 {
+    let mut sum = 0;
+    let mut current = Some(testlist);
+    while let Some(node) = current {
+        sum += node.value;
+        current = node.next.as_deref();
+    }
+    sum
+}
+
 #[entry]
 fn main(mut gpio1: Output<6>) -> ! {
-    ALLOCATOR.init();
     let mut i: u32 = 0;
 
-    let ptr = ADDRESS as *mut u32;
+    let v = get_transfer::<TestList>().unwrap();
+    let val = sum_testlist(&v);
 
+    let ptr = ADDRESS as *mut u32;
     loop {
-        i = i.wrapping_add(1u32);
+        // i = i.wrapping_add(1u32);
         unsafe {
-            ptr.write_volatile(i);
+            ptr.write_volatile(val as u32);
         }
 
         gpio1.set_high().unwrap();
