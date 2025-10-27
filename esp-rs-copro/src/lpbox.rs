@@ -1,4 +1,6 @@
-use core::{any::Any, arch::asm, mem, ptr::{null, NonNull}};
+use core::{any::Any, mem, ops::{Deref, DerefMut}, ptr::{null, NonNull}};
+use alloc::alloc::dealloc;
+
 use crate::MovableObject;
 use crate::lpalloc;
 
@@ -20,7 +22,7 @@ fn lpbox_alloc(l : core::alloc::Layout) -> *mut u8 {
     }
 }
 
-impl<T: MovableObject> LPBox<T> {
+impl<T: Sized + MovableObject> LPBox<T> {
     pub fn new(value: T) -> Self { unsafe {
         let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
         ptr.write(value);
@@ -48,3 +50,21 @@ impl<T: MovableObject> LPBox<T> {
         }
     }
 }
+
+impl<T : MovableObject> Deref for LPBox<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.0.as_ref() }
+    }
+}
+impl<T : MovableObject> DerefMut for LPBox<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.0.as_mut() }
+    }
+}
+
+// impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
+//     fn drop(&mut self) {
+//         unsafe{alloc::alloc::dealloc(self.0.as_ptr() as *mut u8, core::alloc::Layout::for_value(self.0.as_ref()));}
+//     }
+// }
