@@ -1,35 +1,29 @@
 use core::{alloc::{GlobalAlloc, Layout}, cell::UnsafeCell, mem::MaybeUninit, ptr::null_mut};
-pub struct LPAllocator<const SIZE: usize> {
-    allocated : usize,
-    free_ptr : UnsafeCell<*mut BlockHeader>,
-    heap : [MaybeUninit<u8>; SIZE]
+
+
+pub struct ImplLPAllocator<const SIZE : usize> {
+    pub free_ptr: UnsafeCell<*mut BlockHeader>,
+    pub heap : [MaybeUninit<u8>; SIZE]
 }
 
-pub trait LPAlloc {
-    unsafe fn alloc_on_lp(&self, layout : Layout) -> * mut u8;
-    fn init(&mut self);
-    fn check_initialized(&self) -> bool;
-}
-
-impl<const SIZE : usize> LPAlloc for LPAllocator<SIZE> {
-    unsafe fn alloc_on_lp(&self, layout : Layout) -> * mut u8 {
-        unsafe {self.alloc(layout)}
-    }
-    fn init(&mut self) { unsafe{
-        let bh : * mut BlockHeader = self.heap.as_mut_ptr().cast();
-        BlockHeader::init_header_value(bh, SIZE, null_mut(), null_mut(), null_mut());
-        let fb : * mut FreeBlock = self.heap.as_mut_ptr().byte_add(core::mem::size_of::<BlockHeader>()) as * mut FreeBlock;
-        (*fb).next = null_mut();
-        self.free_ptr.get().write(self.heap.as_ptr() as * mut BlockHeader);
-    }}
-    fn check_initialized(&self) -> bool {
-        #[allow(useless_ptr_null_checks)]
-        {
-            !(self.free_ptr.get() as *mut u8).is_null()
+impl<const SIZE : usize> ImplLPAllocator<SIZE> {
+    pub const fn new() -> Self {
+        ImplLPAllocator {
+            free_ptr: UnsafeCell::new(null_mut()),
+            heap: [MaybeUninit::<u8>::uninit(); SIZE]
         }
     }
 }
-struct BlockHeader {
+impl<const SIZE : usize> ImplLPAllocator<SIZE> {
+    pub fn init(&mut self) { unsafe{
+        let head = self.heap.as_mut_ptr().cast::<BlockHeader>();
+        *(self.free_ptr.get_mut()) = head;
+        BlockHeader::init_header_value(head, self.heap.len(), null_mut(), null_mut(), null_mut());
+        let fb : * mut FreeBlock = self.heap.as_mut_ptr().byte_add(core::mem::size_of::<BlockHeader>()) as * mut FreeBlock;
+        (*fb).next = null_mut();
+    }}
+}
+pub struct BlockHeader {
     next: * mut BlockHeader,
     vtable: * mut u8,
     prev: * mut BlockHeader,
@@ -55,71 +49,64 @@ pub unsafe fn write_vtable(ptr: * mut u8, vtable: * mut u8) {
     }
 }
 
-struct FreeBlock {
-    next: * mut BlockHeader,
-}
+struct FreeBlock { next: * mut BlockHeader }
 
-impl<const SIZE: usize> LPAllocator<SIZE> {
-    pub const fn new() -> Self { LPAllocator { allocated: 0, free_ptr: UnsafeCell::new(null_mut()), heap : [MaybeUninit::uninit(); SIZE] } }
-}
-
-unsafe impl<const SIZE: usize> GlobalAlloc for LPAllocator<SIZE> {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 { unsafe{
-        let layout = layout.align_to(core::mem::align_of::<FreeBlock>()).unwrap().pad_to_align();
-        let total_size = layout.size() + core::mem::size_of::<BlockHeader>();
-        let mut current_ptr : *mut *mut BlockHeader = &self.free_ptr as * const _ as * mut * mut BlockHeader;
-        let mut current = *current_ptr;
-        while !current.is_null() {
-            let fb = BlockHeader::get_value::<FreeBlock>(current);
-            if (*current).size < total_size {
-                current_ptr = &(*fb).next as * const _ as * mut * mut BlockHeader;
-                current = (*fb).next;
-                continue;
-            }
-            // found a block
-            let remaining = (*current).size - total_size;
-            if remaining > core::mem::size_of::<BlockHeader>() + core::mem::size_of::<FreeBlock>() {
-                // Split the block
-                let new_block = (current as usize + total_size) as * mut BlockHeader;
-                BlockHeader::init_header_value(new_block, remaining, null_mut(), current, (*current).next);
-                if !(*current).next.is_null() {
-                    (*(*current).next).prev = new_block;
+unsafe impl<const SIZE : usize> GlobalAlloc for ImplLPAllocator<SIZE> {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        unsafe {
+            let layout = layout.align_to(core::mem::align_of::<FreeBlock>()).unwrap().pad_to_align();
+            let total_size = layout.size() + core::mem::size_of::<BlockHeader>();
+            let mut current_ptr: *mut *mut BlockHeader = self.free_ptr.get();
+            let mut current = *current_ptr;
+            while !current.is_null() {
+                let fb = BlockHeader::get_value::<FreeBlock>(current);
+                if (*current).size < total_size {
+                    current_ptr = &(*fb).next as * const _ as * mut * mut BlockHeader;
+                    current = (*fb).next;
+                    continue;
                 }
-                (*current).next = new_block;
-                (*current).size = total_size;
-                (*(BlockHeader::get_value::<FreeBlock>(new_block))).next = (*fb).next;
-                *current_ptr = new_block;
-            } else {
-                *current_ptr = (*fb).next;
-            }
-            return (current as usize + core::mem::size_of::<BlockHeader>()) as * mut u8;
-        }
-        return null_mut();
-    }}
-
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) { unsafe{
-        let header = (ptr as usize - core::mem::size_of::<BlockHeader>()) as * mut BlockHeader;
-        // Coalesce with previous block if free
-        if !(*header).prev.is_null() {
-            let prev_header = (*header).prev;
-            if (*prev_header).vtable.is_null() { // check whether the previous block is free.
-                // Merge
-                (*prev_header).size += (*header).size;
-                (*prev_header).next = (*header).next;
-                if !(*header).next.is_null() {
-                    (*(*header).next).prev = prev_header;
+                // found a block
+                let remaining = (*current).size - total_size;
+                if remaining > core::mem::size_of::<BlockHeader>() + core::mem::size_of::<FreeBlock>() {
+                    // Split the block
+                    let new_block = (current as usize + total_size) as * mut BlockHeader;
+                    BlockHeader::init_header_value(new_block, remaining, null_mut(), current, (*current).next);
+                    if !(*current).next.is_null() {
+                        (*(*current).next).prev = new_block;
+                    }
+                    (*current).next = new_block;
+                    (*current).size = total_size;
+                    (*(BlockHeader::get_value::<FreeBlock>(new_block))).next = (*fb).next;
+                    *current_ptr = new_block;
+                } else {
+                    *current_ptr = (*fb).next;
                 }
-                return;
+                return (current as usize + core::mem::size_of::<BlockHeader>()) as * mut u8;
             }
+            return null_mut();
         }
-        (*header).vtable = null_mut(); // mark as free
-        let fb = BlockHeader::get_value::<FreeBlock>(header);
-        (*(fb)).next = self.free_ptr.get().read();
-        self.free_ptr.get().write(header);
-    }}
+    }
 
-    // We can also override alloc_zeroed and realloc for more detailed logging
-    // or rely on their default implementations. For brevity, we'll use defaults.
+    unsafe fn dealloc(&self, ptr : *mut u8, layout: Layout) {
+        unsafe {
+            let header = (ptr as usize - core::mem::size_of::<BlockHeader>()) as * mut BlockHeader;
+            // Coalesce with previous block if free
+            if !(*header).prev.is_null() {
+                let prev_header = (*header).prev;
+                if (*prev_header).vtable.is_null() { // check whether the previous block is free.
+                    // Merge
+                    (*prev_header).size += (*header).size;
+                    (*prev_header).next = (*header).next;
+                    if !(*header).next.is_null() {
+                        (*(*header).next).prev = prev_header;
+                    }
+                    return;
+                }
+            }
+            (*header).vtable = null_mut(); // mark as free
+            let fb = BlockHeader::get_value::<FreeBlock>(header);
+            (*(fb)).next = self.free_ptr.get().read();
+            self.free_ptr.get().write(header);
+        }
+    }
 }
-
-unsafe impl<const SIZE: usize> Sync for LPAllocator<SIZE> {}

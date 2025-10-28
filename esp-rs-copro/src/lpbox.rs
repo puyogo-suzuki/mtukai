@@ -1,5 +1,4 @@
-use core::{any::Any, mem, ops::{Deref, DerefMut}, ptr::{null, NonNull}};
-use alloc::alloc::dealloc;
+use core::{alloc::GlobalAlloc, mem, ops::{Deref, DerefMut}, ptr::NonNull};
 
 use crate::MovableObject;
 use crate::lpalloc;
@@ -37,14 +36,14 @@ impl<T: Sized + MovableObject> LPBox<T> {
     //     LPBox(NonNull::new_unchecked(ptr))
     // }}
 
-    fn new_on_lp(value: &T, allocator: &dyn lpalloc::LPAlloc) -> Self { unsafe {
+    fn new_on_lp(value: &T, allocator: &dyn GlobalAlloc) -> Self { unsafe {
         let ptr = value.move_to_lp(allocator);
         // ptr.copy_from(value, layout.size());
         lpalloc::write_vtable(ptr as * mut u8, get_vtable(value) as * mut u8);
         LPBox(NonNull::new_unchecked(ptr as *mut T))
     }}
 
-    pub fn move_to_lp(&self, allocator: &dyn lpalloc::LPAlloc) -> LPBox<T>{
+    pub fn move_to_lp(&self, allocator: &dyn GlobalAlloc) -> LPBox<T>{
         match self {
             LPBox(p) => unsafe { LPBox::new_on_lp(p.as_ref(), allocator)}
         }

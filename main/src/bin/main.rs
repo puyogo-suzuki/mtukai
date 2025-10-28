@@ -11,7 +11,7 @@ use esp_hal::clock::CpuClock;
 use esp_hal::main;
 use esp_hal::time::{Duration, Instant};
 
-use esp_rs_copro::{lpalloc::LPAlloc, lpbox::LPBox, MovableObject, TestList};
+use esp_rs_copro::{lpbox::LPBox, MovableObject, TestList};
 
 use esp_hal::{
     gpio::lp_io::LowPowerOutput,
