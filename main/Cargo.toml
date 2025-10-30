@@ -17,7 +17,7 @@ esp-backtrace = { version="0.17.0", features = [
 ] }
 esp-bootloader-esp-idf = { version = "0.2.0", features = ["esp32c6"] }
 esp-hal                = { version = "=1.0.0-rc.0", features = ["esp32c6", "unstable", "log-04"] }
-esp-rs-copro           = { path = "../esp-rs-copro" }
+esp-rs-copro           = { path = "../esp-rs-copro", features = ["has-lp-core"] }
 esp-rs-copro-procmacro = { path = "../esp-rs-copro-procmacro" , features = ["has-lp-core"] }
 
 critical-section = "1.2.0"

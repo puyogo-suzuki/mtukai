@@ -3,3 +3,7 @@ name = "esp-rs-copro"
 version = "0.1.0"
 
 [dependencies]
+
+[features]
+is-lp-core = []
+has-lp-core = []

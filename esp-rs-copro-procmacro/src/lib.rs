@@ -28,7 +28,7 @@ pub fn esp_rs_copro_statics(_attr: TokenStream) -> TokenStream {
         #[used]
         #[unsafe(export_name=#export_name_lit)]
         static mut allocator : #copro_crate::lpalloc::ImplLPAllocator<#heap_size> = #copro_crate::lpalloc::ImplLPAllocator::new();
-        fn get_transfer<T : #copro_crate::MovableObject>() -> Option<&'static mut T> {
+        fn get_transfer<T : #copro_crate::movableobject::MovableObject>() -> Option<&'static mut T> {
             if(unsafe{!allocator.free_ptr.get().is_null()}) {
                 Some(unsafe { &mut *(TRANSFER as * mut T) })
             } else {
@@ -84,7 +84,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     
     let copro_crate_use = if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-rs-copro") {
         let ident = Ident::new(name, Span::call_site().into());
-        quote!{use #ident ::lpalloc::ImplLPAllocator}
+        quote!{use #ident ::{ lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject};}
     } else { quote!{} };
 
     let lit: LitStr = match syn::parse(input) {
@@ -189,7 +189,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     let rtc_code_start = quote! { _rtc_slow_data_start };
 
     let transfer = if let Some(a) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_TRANSFER")).map(|s| s.address()) {
-        quote!{unsafe{((#a) as *mut *mut u8).write_volatile(transfer_value.move_to_lp());}}
+        quote!{unsafe {((#a) as *mut *mut u8).write_volatile(LPBox::<T>::write_to_lp(transfer_value));}}
     } else { quote! {}};
     let allocsym = obj_file.symbols().find(|s| s.name().map_or(false, |v| v.starts_with("__COPRO_ALLOCATOR_")));
     let (allocfun, lpalloc) = if let Some(a) = allocsym {
@@ -217,14 +217,12 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                     unsafe { LPAllocator::get_allocator().as_ref().unwrap().dealloc(ptr, layout); }
                 }
             }
-            #[allow(improper_ctypes)]
             #[unsafe(no_mangle)]
             pub extern "Rust" fn __lpcoproc_allocator_alloc(layout: core::alloc::Layout) -> * mut u8 {
                 use core::alloc::GlobalAlloc;
                 println!("alloc on LP");
                 unsafe { LPAllocator::get_allocator().as_ref().unwrap().alloc(layout) }
             }
-            #[allow(improper_ctypes)]
             #[unsafe(no_mangle)]
             pub extern "Rust" fn __lpcoproc_allocator_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
                 use core::alloc::GlobalAlloc;

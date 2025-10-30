@@ -1,6 +1,8 @@
 use core::{alloc::GlobalAlloc, mem, ops::{Deref, DerefMut}, ptr::NonNull};
 
 use crate::MovableObject;
+#[cfg(any(feature = "has-lp-core", test))]
+use crate::addresstranslation::AddressTranslationTable;
 use crate::lpalloc;
 
 pub struct LPBox<T: ?Sized + MovableObject>(pub(crate) NonNull<T>);
@@ -21,6 +23,10 @@ fn lpbox_alloc(l : core::alloc::Layout) -> *mut u8 {
     }
 }
 
+#[cfg(any(feature = "has-lp-core", test))]
+static mut ADDRESS_TRANSLATION_TABLE : AddressTranslationTable = AddressTranslationTable::new();
+
+
 impl<T: Sized + MovableObject> LPBox<T> {
     pub fn new(value: T) -> Self { unsafe {
         let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
@@ -36,17 +42,18 @@ impl<T: Sized + MovableObject> LPBox<T> {
     //     LPBox(NonNull::new_unchecked(ptr))
     // }}
 
-    fn new_on_lp(value: &T) -> Self { unsafe {
-        let ptr = value.move_to_lp();
+    pub fn write_to_lp(value : &T) -> * mut u8 { unsafe {
+        let ptr = lpalloc::lp_allocator_alloc(core::alloc::Layout::new::<T>()) as * mut u8;
+        value.move_to_lp(ptr);
         // ptr.copy_from(value, layout.size());
         lpalloc::write_vtable(ptr as * mut u8, get_vtable(value) as * mut u8);
-        LPBox(NonNull::new_unchecked(ptr as *mut T))
+        #[cfg(any(feature = "has-lp-core", test))]
+        ADDRESS_TRANSLATION_TABLE.insert(value as * const T as * const () as usize, ptr as usize);
+        ptr
     }}
 
     pub fn move_to_lp(&self) -> LPBox<T>{
-        match self {
-            LPBox(p) => unsafe { LPBox::new_on_lp(p.as_ref())}
-        }
+        unsafe { LPBox(NonNull::new_unchecked(Self::write_to_lp(self.0.as_ref()) as * mut T))}
     }
 }
 
