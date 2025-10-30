@@ -36,16 +36,16 @@ impl<T: Sized + MovableObject> LPBox<T> {
     //     LPBox(NonNull::new_unchecked(ptr))
     // }}
 
-    fn new_on_lp(value: &T, allocator: &dyn GlobalAlloc) -> Self { unsafe {
-        let ptr = value.move_to_lp(allocator);
+    fn new_on_lp(value: &T) -> Self { unsafe {
+        let ptr = value.move_to_lp();
         // ptr.copy_from(value, layout.size());
         lpalloc::write_vtable(ptr as * mut u8, get_vtable(value) as * mut u8);
         LPBox(NonNull::new_unchecked(ptr as *mut T))
     }}
 
-    pub fn move_to_lp(&self, allocator: &dyn GlobalAlloc) -> LPBox<T>{
+    pub fn move_to_lp(&self) -> LPBox<T>{
         match self {
-            LPBox(p) => unsafe { LPBox::new_on_lp(p.as_ref(), allocator)}
+            LPBox(p) => unsafe { LPBox::new_on_lp(p.as_ref())}
         }
     }
 }
@@ -62,8 +62,16 @@ impl<T : MovableObject> DerefMut for LPBox<T> {
     }
 }
 
-// impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
-//     fn drop(&mut self) {
-//         unsafe{alloc::alloc::dealloc(self.0.as_ptr() as *mut u8, core::alloc::Layout::for_value(self.0.as_ref()));}
-//     }
-// }
+impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
+    fn drop(&mut self) {
+        unsafe{self.0.drop_in_place();}
+        let addr : usize = self.0.as_ptr() as *mut () as usize;
+        let ptr = self.0.as_ptr() as * mut u8;
+        let lay = unsafe {core::alloc::Layout::for_value(self.0.as_ref())};
+        if addr >= 0x5000_0000 && addr < 0x5004_0000 {
+            unsafe{lpalloc::lp_allocator_dealloc(ptr, lay);} // lp coprocessor
+        } else {
+            unsafe{alloc::alloc::dealloc(ptr, lay);} // main processor
+        }
+    }
+}

@@ -189,7 +189,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     let rtc_code_start = quote! { _rtc_slow_data_start };
 
     let transfer = if let Some(a) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_TRANSFER")).map(|s| s.address()) {
-        quote!{unsafe{((#a) as *mut *mut u8).write_volatile(transfer_value.move_to_lp(&LPALLOCATOR));}}
+        quote!{unsafe{((#a) as *mut *mut u8).write_volatile(transfer_value.move_to_lp());}}
     } else { quote! {}};
     let allocsym = obj_file.symbols().find(|s| s.name().map_or(false, |v| v.starts_with("__COPRO_ALLOCATOR_")));
     let (allocfun, lpalloc) = if let Some(a) = allocsym {
@@ -209,11 +209,27 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
             }
             unsafe impl core::alloc::GlobalAlloc for LPAllocator {
                 unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
+                    use core::alloc::GlobalAlloc;
                     unsafe { LPAllocator::get_allocator().as_ref().unwrap().alloc(layout) }
                 }
                 unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
+                    use core::alloc::GlobalAlloc;
                     unsafe { LPAllocator::get_allocator().as_ref().unwrap().dealloc(ptr, layout); }
                 }
+            }
+            #[allow(improper_ctypes)]
+            #[unsafe(no_mangle)]
+            pub extern "Rust" fn __lpcoproc_allocator_alloc(layout: core::alloc::Layout) -> * mut u8 {
+                use core::alloc::GlobalAlloc;
+                println!("alloc on LP");
+                unsafe { LPAllocator::get_allocator().as_ref().unwrap().alloc(layout) }
+            }
+            #[allow(improper_ctypes)]
+            #[unsafe(no_mangle)]
+            pub extern "Rust" fn __lpcoproc_allocator_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
+                use core::alloc::GlobalAlloc;
+                println!("dealloc on LP");
+                unsafe { LPAllocator::get_allocator().as_ref().unwrap().dealloc(ptr, layout); }
             }
             unsafe impl Sync for LPAllocator {}
         })

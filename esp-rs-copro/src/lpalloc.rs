@@ -51,6 +51,15 @@ pub unsafe fn write_vtable(ptr: * mut u8, vtable: * mut u8) {
 
 struct FreeBlock { next: * mut BlockHeader }
 
+#[allow(improper_ctypes)]
+extern "Rust" {
+    #[link_name = "__lpcoproc_allocator_alloc"]
+    pub(crate) fn lp_allocator_alloc(layout: Layout) -> * mut u8;
+
+    #[link_name = "__lpcoproc_allocator_dealloc"]
+    pub(crate) fn lp_allocator_dealloc(ptr: * mut u8, layout: Layout);
+}
+
 unsafe impl<const SIZE : usize> GlobalAlloc for ImplLPAllocator<SIZE> {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         unsafe {
