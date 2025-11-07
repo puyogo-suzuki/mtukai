@@ -81,19 +81,24 @@ pub fn cleanup() {
 }
 
 impl<T: Sized + MovableObject> LPBox<T> {
+    #[cfg(any(feature = "has-lp-core", test))]
     pub fn new(value: T) -> Self { unsafe {
         let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
         ptr.write(value);
         LPBox(NonNull::new_unchecked(ptr))
     }}
 
-    // fn new_on_lp(value: T, allocator: &dyn lpalloc::LPAlloc) -> Self { unsafe {
-    //     let layout = core::alloc::Layout::new::<T>();
-    //     let ptr = allocator.alloc_on_lp(layout) as * mut T;
-    //     lpalloc::write_vtable(ptr as * mut u8, get_vtable(&value) as * mut u8);
-    //     ptr.write(value);
-    //     LPBox(NonNull::new_unchecked(ptr))
-    // }}
+    #[cfg(feature = "is-lp-core")]
+    pub fn new(value: T) -> Self { unsafe {
+        let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
+        ptr.write(value);
+        lpalloc::write_vtable(ptr as * mut u8, get_vtable(&value) as * mut u8);
+        LPBox(NonNull::new_unchecked(ptr))
+    }}
+
+    pub fn from_box(value : alloc::boxed::Box<T>) -> Self{
+        LPBox(NonNull::new(alloc::boxed::Box::into_raw(value)).unwrap())
+    }
 
     #[cfg(any(feature = "has-lp-core", test))]
     pub fn write_to_lp(value : &T) -> * mut u8 { unsafe {
