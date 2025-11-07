@@ -1,4 +1,4 @@
-use core::{alloc::GlobalAlloc, mem, ops::{Deref, DerefMut}, ptr::NonNull};
+use core::{alloc::GlobalAlloc, fmt::Debug, mem, ops::{Deref, DerefMut}, ptr::NonNull};
 
 use crate::MovableObject;
 #[cfg(any(feature = "has-lp-core", test))]
@@ -6,6 +6,12 @@ use crate::addresstranslation::AddressTranslationTable;
 use crate::lpalloc;
 
 pub struct LPBox<T: ?Sized + MovableObject>(pub(crate) NonNull<T>);
+
+impl<T: MovableObject> Debug for LPBox<T> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "LPBox({:p})", self.0.as_ptr())
+    }
+}
 
 fn get_vtable(obj: &dyn MovableObject) -> *const u8 {
     let fat_ptr_addr = obj as *const dyn MovableObject as *const [usize; 2];
@@ -24,8 +30,34 @@ fn lpbox_alloc(l : core::alloc::Layout) -> *mut u8 {
 }
 
 #[cfg(any(feature = "has-lp-core", test))]
-static mut ADDRESS_TRANSLATION_TABLE : AddressTranslationTable = AddressTranslationTable::new();
+pub(crate) static ADDRESS_TRANSLATION_TABLE : SyncImplementedRefCell<AddressTranslationTable> =
+    SyncImplementedRefCell::new(AddressTranslationTable::new());
+static LPBOX_DROP_ENABLE : SyncImplementedBool = SyncImplementedBool::new(true);
 
+pub(crate) struct SyncImplementedRefCell<T>(core::cell::RefCell<T>);
+impl<T> SyncImplementedRefCell<T> {
+    pub const fn new(value: T) -> Self {
+        SyncImplementedRefCell(core::cell::RefCell::new(value))
+    }
+    pub fn borrow_mut(&self) -> core::cell::RefMut<'_, T> {
+        self.0.borrow_mut()
+    }
+}
+unsafe impl<T> Sync for SyncImplementedRefCell<T> {}
+
+struct SyncImplementedBool(core::cell::Cell<bool>);
+impl SyncImplementedBool {
+    pub const fn new(value: bool) -> Self {
+        SyncImplementedBool(core::cell::Cell::new(value))
+    }
+    pub fn set(&self, value: bool) {
+        self.0.set(value);
+    }
+    pub fn get(&self) -> bool {
+        self.0.get()
+    }
+}
+unsafe impl Sync for SyncImplementedBool {}
 
 impl<T: Sized + MovableObject> LPBox<T> {
     pub fn new(value: T) -> Self { unsafe {
@@ -42,18 +74,59 @@ impl<T: Sized + MovableObject> LPBox<T> {
     //     LPBox(NonNull::new_unchecked(ptr))
     // }}
 
+    #[cfg(any(feature = "has-lp-core", test))]
+    pub fn write_to_lp(value : &T) -> * mut u8 { unsafe {
+        if let Some(existing_lp_addr) = 
+            ADDRESS_TRANSLATION_TABLE.borrow_mut().get_by_main(value as * const T as usize) {
+            return *existing_lp_addr as * mut u8;
+        }
+        let ptr = lpalloc::lp_allocator_alloc(core::alloc::Layout::new::<T>()) as * mut u8;
+        value.move_to_lp(ptr);
+        // ptr.copy_from(value, layout.size());
+        lpalloc::write_vtable(ptr as * mut u8, get_vtable(value) as * mut u8);
+        ADDRESS_TRANSLATION_TABLE.borrow_mut().insert_no_drop(value as *const T as *mut T, ptr as usize);
+        ptr
+    }}
+    #[cfg(not(any(feature = "has-lp-core", test)))]
     pub fn write_to_lp(value : &T) -> * mut u8 { unsafe {
         let ptr = lpalloc::lp_allocator_alloc(core::alloc::Layout::new::<T>()) as * mut u8;
         value.move_to_lp(ptr);
         // ptr.copy_from(value, layout.size());
         lpalloc::write_vtable(ptr as * mut u8, get_vtable(value) as * mut u8);
-        #[cfg(any(feature = "has-lp-core", test))]
-        ADDRESS_TRANSLATION_TABLE.insert(value as * const T as * const () as usize, ptr as usize);
         ptr
     }}
 
-    pub fn move_to_lp(&self) -> LPBox<T>{
+    pub fn get_moved_to_lp(&self) -> LPBox<T>{
         unsafe { LPBox(NonNull::new_unchecked(Self::write_to_lp(self.0.as_ref()) as * mut T))}
+    }
+    #[cfg(any(feature = "has-lp-core", test))]
+    pub fn get_moved_to_main(&self) -> LPBox<T> {
+        unsafe {
+            let addr =
+                ADDRESS_TRANSLATION_TABLE.borrow_mut().remove_by_lp(self.0.as_ptr() as * const () as usize)
+                    .map_or_else(|| lpbox_alloc(core::alloc::Layout::new::<T>()) as * mut T, |a| a as *mut T);
+            self.0.as_ref().move_to_main(addr as * mut u8);
+            LPBox(NonNull::new_unchecked(addr))
+        }
+    }
+    #[cfg(not(any(feature = "has-lp-core", test)))]
+    pub fn get_moved_to_main(&self) -> LPBox<T> {
+        unsafe {
+            let addr = lpbox_alloc(core::alloc::Layout::new::<T>()) as * mut T;
+            self.move_to_main(addr as * mut u8);
+            LPBox(NonNull::new_unchecked(addr))
+        }
+    }
+}
+
+
+impl<T: MovableObject> MovableObject for LPBox<T> {
+    unsafe fn move_to_main(&self, dest: *mut u8) {
+        *(dest as *mut LPBox<T>) = self.get_moved_to_main();
+    }
+
+    unsafe fn move_to_lp(&self, dest: *mut u8) {
+        *(dest as *mut LPBox<T>) = self.get_moved_to_lp();
     }
 }
 
@@ -69,8 +142,19 @@ impl<T : MovableObject> DerefMut for LPBox<T> {
     }
 }
 
+#[cfg(any(feature = "has-lp-core", test))]
+pub fn cleanup() {
+    LPBOX_DROP_ENABLE.set(false);
+    ADDRESS_TRANSLATION_TABLE.borrow_mut().drop_and_clear();
+    LPBOX_DROP_ENABLE.set(true);
+}
+
 impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
     fn drop(&mut self) {
+        #[cfg(any(feature = "has-lp-core", test))]
+        if !LPBOX_DROP_ENABLE.get() {
+            return;
+        }
         unsafe{self.0.drop_in_place();}
         let addr : usize = self.0.as_ptr() as *mut () as usize;
         let ptr = self.0.as_ptr() as * mut u8;

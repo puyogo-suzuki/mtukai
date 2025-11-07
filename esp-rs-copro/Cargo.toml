@@ -3,7 +3,8 @@ name = "esp-rs-copro"
 version = "0.1.0"
 
 [dependencies]
+esp-println = { version = "0.16.1", features = ["log-04"], optional = true }
 
 [features]
 is-lp-core = []
-has-lp-core = []
+has-lp-core = ["dep:esp-println"]

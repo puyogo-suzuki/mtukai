@@ -33,19 +33,25 @@ fn sum_testlist(testlist : &TestList) -> i32 {
     sum
 }
 
+fn double_testlist(testlist : &mut TestList) {
+    let mut current = Some(testlist);
+    while let Some(node) = current {
+        node.value *= 2;
+        current = node.next.as_deref_mut();
+    }
+}
+
 #[entry]
 fn main(mut gpio1: Output<6>) -> ! {
-    let mut i: u32 = 0;
-
     let v = get_transfer::<TestList>().unwrap();
     let val = sum_testlist(&v);
-
+    double_testlist(v);
     let ptr = ADDRESS as *mut u32;
+    unsafe {
+        ptr.write_volatile(val as u32);
+    }
     loop {
         // i = i.wrapping_add(1u32);
-        unsafe {
-            ptr.write_volatile(val as u32);
-        }
 
         gpio1.set_high().unwrap();
         Delay.delay_ms(500);

@@ -10,8 +10,9 @@ use esp_alloc as _;
 use esp_hal::clock::CpuClock;
 use esp_hal::main;
 use esp_hal::time::{Duration, Instant};
+use esp_hal::delay::Delay;
 
-use esp_rs_copro::{lpbox::LPBox, MovableObject, TestList};
+use esp_rs_copro::{lpbox::LPBox, TestList};
 
 use esp_hal::{
     gpio::lp_io::LowPowerOutput,
@@ -44,12 +45,23 @@ fn test_listcreate() -> TestList {
     }
 }
 
+fn test_listprint(tl : &TestList) {
+    let mut current = Some(tl);
+    println!("Printing TestList.");
+    while let Some(node) = current {
+        println!("Addr: {:p} Value: {}", node as *const _ as *const (), node.value);
+        current = node.next.as_deref();
+    }
+
+}
+
 #[main]
 fn main() -> ! {
     // generator version: 0.5.0
     esp_alloc::heap_allocator!(size: 72 * 1024);
     esp_println::logger::init_logger_from_env();
     let peripherals = esp_hal::init(esp_hal::Config::default());
+    // let delay = Delay::new();
 
     // configure GPIO 1 as LP output pin
     let lp_pin = LowPowerOutput::new(peripherals.GPIO6);
@@ -57,21 +69,24 @@ fn main() -> ! {
     let mut lp_core = LpCore::new(peripherals.LP_CORE);
     lp_core.stop();
     println!("lp core stopped");
-    let mut test_list = test_listcreate();
     // load code to LP core
     let lp_core_code = load_lp_code2!(
         "../lp/target/riscv32imac-unknown-none-elf/release/esp-rs-copro-lp"
     );
 
     // start LP core
-    lp_core_code.run(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut test_list, lp_pin);
-    println!("lpcore run");
+    {
+        let mut test_list = test_listcreate();
+        test_listprint(&test_list);
+        lp_core_code.run(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut test_list, lp_pin);
+        println!("lpcore run!");
 
-    let data = (0x5000_2000) as *mut u32;
-    loop {
+        let data = (0x5000_2000) as *mut u32;
         print!("Result {:x}           \u{000d}", unsafe {
             data.read_volatile()
         });
+        test_listprint(&test_list);
     }
+    loop {}
     // for inspiration have a look at the examples at https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.0.0-rc.0/examples/src/bin
 }

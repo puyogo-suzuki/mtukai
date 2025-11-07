@@ -1,8 +1,33 @@
-use alloc::collections::btree_map::BTreeMap;
+use core::{cell::Cell, mem, ptr};
 
+use alloc::{boxed::Box, collections::btree_map::BTreeMap};
+
+pub(crate) struct SetCopiedByLpResult {
+    pub main_address : usize,
+    pub already_copied : bool
+}
+
+
+pub(crate) enum AddressTranslationAddressValue {
+    Droppable(usize, Box<dyn Fn(*mut u8)>),
+    NonDroppable(usize)
+}
+
+impl AddressTranslationAddressValue {
+    pub fn get_addr(&self) -> usize {
+        match self {
+            AddressTranslationAddressValue::Droppable(addr, _) => addr,
+            AddressTranslationAddressValue::NonDroppable(addr) => addr
+        }.clone()
+    }
+}
+pub(crate) struct AddressTranslationEntry {
+    pub address : AddressTranslationAddressValue,
+    pub copied : bool
+}
 pub(crate) struct AddressTranslationTable {
     main_to_lp: BTreeMap<usize, usize>,
-    lp_to_main: BTreeMap<usize, usize>
+    lp_to_main: BTreeMap<usize, AddressTranslationEntry>
 }
 
 
@@ -14,29 +39,75 @@ impl AddressTranslationTable {
         }
     }
 
-    pub fn insert(&mut self, main: usize, lp: usize) {
-        self.main_to_lp.insert(main, lp);
-        self.lp_to_main.insert(lp, main);
+    pub fn insert<T>(&mut self, main: *mut T, lp: usize) {
+        println!("AddressTranslationTable::insert: main {:p} lp {:x}", main, lp);
+        self.main_to_lp.insert(main as usize, lp);
+        if mem::needs_drop::<T>() {
+            let foo = |v : *mut u8| unsafe{ptr::drop_in_place(v as *mut T)};
+            self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::Droppable(main as usize, Box::new(foo)), copied: false });
+        } else {
+            self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::NonDroppable(main as usize), copied: false });
+        }
     }
 
-    pub fn get_by_main(&self, main: &usize) -> Option<&usize> {
-        self.main_to_lp.get(main)
+    pub fn insert_no_drop<T>(&mut self, main: *mut T, lp: usize) {
+        self.main_to_lp.insert(main as usize, lp);
+        self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::NonDroppable(main as usize), copied: false });
     }
 
-    pub fn get_by_lp(&self, lp: &usize) -> Option<&usize> {
-        self.lp_to_main.get(lp)
+    pub fn get_by_main(&self, main: usize) -> Option<&usize> {
+        self.main_to_lp.get(&main)
     }
 
-    pub fn remove_by_main(&mut self, main: &usize) -> Option<usize> {
-        self.main_to_lp.remove(main).and_then(|lp| {
-            self.lp_to_main.remove(&lp);
-            Some(lp)
+    pub fn get_by_lp(&self, lp: usize) -> Option<&AddressTranslationEntry> {
+        self.lp_to_main.get(&lp)
+    }
+
+    /// This must be called by LPRc and so on.
+    pub fn set_copied_by_lp(&mut self, lp: usize) -> Option<SetCopiedByLpResult>{
+        if let Some(entry) = self.lp_to_main.get_mut(&lp) {
+            let c = entry.copied;
+            entry.copied = true;
+            Some(SetCopiedByLpResult { main_address: entry.address.get_addr(), already_copied: c })
+        } else {
+            None
+        }
+    }
+
+    /// Removes the entry by lp address, returning the main address if it existed
+    /// This must be called by only LPBox.
+    pub fn remove_by_lp(&mut self, lp: usize) -> Option<usize> {
+        self.lp_to_main.remove(&lp).and_then(|main_entry| {
+            let addr = main_entry.address.get_addr();
+            // do not free here, just return the address.
+            self.main_to_lp.remove(&addr);
+            Some(addr)
         })
     }
-    pub fn remove_by_lp(&mut self, lp: &usize) -> Option<usize> {
-        self.lp_to_main.remove(lp).and_then(|main| {
-            self.main_to_lp.remove(&main);
-            Some(main)
-        })
+
+    pub fn drop_and_clear(&mut self) {
+        for e in self.lp_to_main.iter() {
+            match &e.1.address {
+                AddressTranslationAddressValue::Droppable(addr, drop_fn) => {
+                    drop_fn(*addr as *mut u8);
+                },
+                AddressTranslationAddressValue::NonDroppable(_) => {}
+            }
+        }
+        self.lp_to_main.clear();
+        self.main_to_lp.clear();
     }
+
+    // pub fn remove_by_main(&mut self, main: usize) -> Option<usize> {
+    //     self.main_to_lp.remove(&main).and_then(|lp| {
+    //         self.lp_to_main.remove(&lp);
+    //         Some(lp)
+    //     })
+    // }
+    // pub fn remove_by_lp(&mut self, lp: usize) -> Option<usize> {
+    //     self.lp_to_main.remove(&lp).and_then(|main| {
+    //         self.main_to_lp.remove(&main);
+    //         Some(main)
+    //     })
+    // }
 }

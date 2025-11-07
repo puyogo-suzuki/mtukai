@@ -84,7 +84,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     
     let copro_crate_use = if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-rs-copro") {
         let ident = Ident::new(name, Span::call_site().into());
-        quote!{use #ident ::{ lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject};}
+        quote!{use #ident ::{ transfer_functions::*, lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject};}
     } else { quote!{} };
 
     let lit: LitStr = match syn::parse(input) {
@@ -188,9 +188,13 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     #[cfg(feature = "has-ulp-core")]
     let rtc_code_start = quote! { _rtc_slow_data_start };
 
-    let transfer = if let Some(a) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_TRANSFER")).map(|s| s.address()) {
-        quote!{unsafe {((#a) as *mut *mut u8).write_volatile(LPBox::<T>::write_to_lp(transfer_value));}}
-    } else { quote! {}};
+    let (transfer, transfer_back) = if let Some(a) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_TRANSFER")).map(|s| s.address()) {
+        (quote!{
+            let trans = transfer_to_lp(transfer_value);
+            unsafe {((#a) as *mut *mut u8).write_volatile(trans);}
+        },
+        quote!{transfer_to_main(transfer_value, unsafe{((#a) as *mut *mut u8).read_volatile()});})
+    } else { (quote! {}, quote! {})};
     let allocsym = obj_file.symbols().find(|s| s.name().map_or(false, |v| v.starts_with("__COPRO_ALLOCATOR_")));
     let (allocfun, lpalloc) = if let Some(a) = allocsym {
         let addr = a.address();
@@ -266,6 +270,11 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                 ) {
                     #alloccall
                     lp_core.run(wakeup_source);
+                    { // FOR TESTING
+                        let delay = esp_hal::delay::Delay::new();
+                        delay.delay_millis(1000);
+                    }
+                    #transfer_back
                 }
                 #allocfun
             }
