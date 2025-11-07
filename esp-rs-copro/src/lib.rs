@@ -27,9 +27,7 @@ pub mod transfer_functions {
     }
 
     pub fn transfer_to_main<T : MovableObject>(src : &mut T, dst : * mut u8) {
-        println!("transfer_to_main");
         unsafe{(dst as * mut T).as_ref().unwrap().move_to_main(src as * const T as * mut u8);}
-        println!("transfer_to_main2");
         cleanup();
     }
 }

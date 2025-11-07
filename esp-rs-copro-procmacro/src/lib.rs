@@ -224,13 +224,11 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
             #[unsafe(no_mangle)]
             pub extern "Rust" fn __lpcoproc_allocator_alloc(layout: core::alloc::Layout) -> * mut u8 {
                 use core::alloc::GlobalAlloc;
-                println!("alloc on LP");
                 unsafe { LPAllocator::get_allocator().as_ref().unwrap().alloc(layout) }
             }
             #[unsafe(no_mangle)]
             pub extern "Rust" fn __lpcoproc_allocator_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
                 use core::alloc::GlobalAlloc;
-                println!("dealloc on LP");
                 unsafe { LPAllocator::get_allocator().as_ref().unwrap().dealloc(ptr, layout); }
             }
             unsafe impl Sync for LPAllocator {}
