@@ -9,8 +9,6 @@ mod addresstranslation;
 #[macro_use]
 extern crate esp_println;
 
-use core::mem::ManuallyDrop;
-
 // use alloc::alloc::Allocator;
 use crate::{lpbox::LPBox, movableobject::MovableObject};
 pub struct TestList {
@@ -20,7 +18,7 @@ pub struct TestList {
 
 #[cfg(any(feature = "has-lp-core", test))]
 pub mod transfer_functions {
-    use crate::{lpbox::{ADDRESS_TRANSLATION_TABLE, LPBox, cleanup}, movableobject::MovableObject};
+    use crate::{lpbox::{LPBox, cleanup}, movableobject::MovableObject};
 
     pub fn transfer_to_lp<T : MovableObject>(src : &T) -> *mut u8 {
         LPBox::<T>::write_to_lp(src)

@@ -1,4 +1,4 @@
-use core::{cell::Cell, mem, ptr};
+use core::{mem, ptr};
 
 use alloc::{boxed::Box, collections::btree_map::BTreeMap};
 
@@ -6,7 +6,6 @@ pub(crate) struct SetCopiedByLpResult {
     pub main_address : usize,
     pub already_copied : bool
 }
-
 
 pub(crate) enum AddressTranslationAddressValue {
     Droppable(usize, Box<dyn Fn(*mut u8)>),
