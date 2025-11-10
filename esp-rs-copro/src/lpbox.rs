@@ -1,8 +1,6 @@
 use core::{alloc::GlobalAlloc, fmt::Debug, mem, ops::{Deref, DerefMut}, ptr::NonNull};
 
-use crate::MovableObject;
-#[cfg(any(feature = "has-lp-core", test))]
-use crate::addresstranslation::AddressTranslationTable;
+use crate::movableobject::MovableObject;
 use crate::lpalloc;
 
 pub struct LPBox<T: ?Sized + MovableObject>(pub(crate) NonNull<T>);
@@ -145,11 +143,11 @@ impl<T: Sized + MovableObject> LPBox<T> {
 
 impl<T: MovableObject> MovableObject for LPBox<T> {
     unsafe fn move_to_main(&self, dest: *mut u8) {
-        *(dest as *mut LPBox<T>) = self.get_moved_to_main();
+        unsafe { *(dest as *mut LPBox<T>) = self.get_moved_to_main(); }
     }
 
     unsafe fn move_to_lp(&self, dest: *mut u8) {
-        *(dest as *mut LPBox<T>) = self.get_moved_to_lp();
+        unsafe { *(dest as *mut LPBox<T>) = self.get_moved_to_lp(); }
     }
 }
 
