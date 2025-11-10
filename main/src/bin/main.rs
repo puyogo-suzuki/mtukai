@@ -12,7 +12,8 @@ use esp_hal::main;
 use esp_hal::time::{Duration, Instant};
 use esp_hal::delay::Delay;
 
-use esp_rs_copro::{lpbox::LPBox, TestList};
+use esp_rs_copro::lpbox::LPBox;
+use shared::TestList;
 
 use esp_hal::{
     gpio::lp_io::LowPowerOutput,

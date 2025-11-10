@@ -11,11 +11,6 @@ mod addresstranslation;
 extern crate esp_println;
 
 // use alloc::alloc::Allocator;
-use crate::{lpbox::LPBox, movableobject::MovableObject};
-pub struct TestList {
-    pub next : Option<LPBox<TestList>>,
-    pub value : i32
-}
 
 #[cfg(any(feature = "has-lp-core", test))]
 pub mod transfer_functions {
@@ -30,39 +25,4 @@ pub mod transfer_functions {
         remove_by_main(src as * const T as usize);
         cleanup();
     }
-}
-
-impl MovableObject for Option<LPBox<TestList>> {
-    unsafe fn move_to_main(&self, dest : *mut u8) { unsafe {
-        let dest = dest as * mut Option<LPBox<TestList>>;
-        dest.write_volatile(match self {
-            Some(boxed) => { 
-                let addr  = boxed.get_moved_to_main();
-                Some(addr)
-            },
-            None => { None }
-        });
-    }}
-
-    unsafe fn move_to_lp(&self, dest : *mut u8) { unsafe {
-        let dest = dest as * mut Option<LPBox<TestList>>;
-        dest.write_volatile( match self {
-            Some(boxed) => { Some(boxed.get_moved_to_lp()) },
-            None => { None }
-        });
-    }}
-}
-
-impl MovableObject for TestList {
-    unsafe fn move_to_main(&self, dest : *mut u8) { unsafe {
-        let dest = dest as * mut TestList;
-        (*dest).value = self.value;
-        self.next.move_to_main((&mut (*dest).next) as * mut Option<LPBox<TestList>> as * mut u8);
-    }}
-
-    unsafe fn move_to_lp(&self, dest : *mut u8) { unsafe {
-        let dest = dest as * mut TestList;
-        (*dest).value = self.value;
-        self.next.move_to_lp((&mut (*dest).next) as * mut Option<LPBox<TestList>> as * mut u8);
-    }}
 }

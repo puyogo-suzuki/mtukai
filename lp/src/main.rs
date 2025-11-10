@@ -4,7 +4,7 @@
 
 use embedded_hal::{delay::DelayNs, digital::OutputPin};
 use esp_lp_hal::{delay::Delay, gpio::Output, prelude::*};
-use esp_rs_copro::TestList;
+use shared::TestList;
 use panic_halt as _;
 
 esp_rs_copro_procmacro::esp_rs_copro_statics!(4096);

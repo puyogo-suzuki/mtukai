@@ -540,6 +540,7 @@ dependencies = [
  "esp-println",
  "esp-rs-copro",
  "esp-rs-copro-procmacro",
+ "shared",
 ]
 
 [[package]]
@@ -1060,6 +1061,13 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
+]
+
+[[package]]
+name = "shared"
+version = "0.1.0"
+dependencies = [
+ "esp-rs-copro",
 ]
 
 [[package]]
