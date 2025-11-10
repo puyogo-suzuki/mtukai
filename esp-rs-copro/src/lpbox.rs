@@ -73,11 +73,18 @@ pub(crate) mod lpbox_static {
     pub fn check_lpbox_drop_enable() -> bool {
         LPBOX_DROP_ENABLE.get()
     }
+    pub fn remove_by_main(main: usize) -> Option<usize> {
+        ADDRESS_TRANSLATION_TABLE.borrow_mut().remove_by_main(main)
+    }
 }
 
 #[cfg(any(feature = "has-lp-core", test))]
 pub fn cleanup() {
     lpbox_static::cleanup();
+}
+#[cfg(any(feature = "has-lp-core", test))]
+pub(crate) fn remove_by_main(main: usize) -> Option<usize> {
+    lpbox_static::remove_by_main(main)
 }
 
 impl<T: Sized + MovableObject> LPBox<T> {

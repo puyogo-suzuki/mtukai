@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(layout_for_ptr)]
 extern crate alloc;
 pub mod lpalloc;
 pub mod lpbox;
@@ -18,7 +19,7 @@ pub struct TestList {
 
 #[cfg(any(feature = "has-lp-core", test))]
 pub mod transfer_functions {
-    use crate::{lpbox::{LPBox, cleanup}, movableobject::MovableObject};
+    use crate::{lpbox::{LPBox, cleanup, remove_by_main}, movableobject::MovableObject};
 
     pub fn transfer_to_lp<T : MovableObject>(src : &T) -> *mut u8 {
         LPBox::<T>::write_to_lp(src)
@@ -26,6 +27,7 @@ pub mod transfer_functions {
 
     pub fn transfer_to_main<T : MovableObject>(src : &mut T, dst : * mut u8) {
         unsafe{(dst as * mut T).as_ref().unwrap().move_to_main(src as * const T as * mut u8);}
+        remove_by_main(src as * const T as usize);
         cleanup();
     }
 }
