@@ -166,8 +166,8 @@ impl<T : MovableObject> DerefMut for LPBox<T> {
 }
 
 impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
+    #[cfg(any(feature = "has-lp-core", test))]
     fn drop(&mut self) {
-        #[cfg(any(feature = "has-lp-core", test))]
         if !lpbox_static::check_lpbox_drop_enable() {
             return;
         }
@@ -179,6 +179,18 @@ impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
             unsafe{lpalloc::lp_allocator_dealloc(ptr, lay);} // lp coprocessor
         } else {
             unsafe{alloc::alloc::dealloc(ptr, lay);} // main processor
+        }
+    }
+    #[cfg(not(any(feature = "has-lp-core", test)))]
+    fn drop(&mut self) {
+        let addr : usize = self.0.as_ptr() as *mut () as usize;
+        let ptr = self.0.as_ptr() as * mut u8;
+        let lay = unsafe {core::alloc::Layout::for_value(self.0.as_ref())};
+        if addr >= 0x5000_0000 && addr < 0x5004_0000 {
+            unsafe{self.0.drop_in_place();}
+            unsafe{alloc::alloc::dealloc(ptr, lay);} // lp processor
+        } else {
+            // do not drop, as it is on the main coprocessor
         }
     }
 }
