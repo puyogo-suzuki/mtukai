@@ -85,6 +85,17 @@ pub(crate) fn remove_by_main(main: usize) -> Option<usize> {
     lpbox_static::remove_by_main(main)
 }
 
+impl<T: MovableObject, const N : usize> LPBox<[T;N]> {
+    pub fn into_dynamic_slice(self) -> LPBox<[T]> {
+        let original = mem::ManuallyDrop::new(self);
+        unsafe {
+            let ptr = original.0.as_ptr() as * mut T;
+            let slice_ptr = core::ptr::slice_from_raw_parts_mut(ptr, N);
+            LPBox(NonNull::new_unchecked(slice_ptr))
+        }
+    }
+}
+
 impl<T: Sized + MovableObject> LPBox<T> {
     #[cfg(any(feature = "has-lp-core", test))]
     pub fn new(value: T) -> Self { unsafe {
