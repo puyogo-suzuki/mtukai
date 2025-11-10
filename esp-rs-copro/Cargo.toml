@@ -1,6 +1,7 @@
 [package]
 name = "esp-rs-copro"
 version = "0.1.0"
+edition = "2024"
 
 [dependencies]
 esp-println = { version = "0.16.1", features = ["log-04"], optional = true }
