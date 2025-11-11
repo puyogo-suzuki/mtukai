@@ -111,37 +111,42 @@ impl<T: Sized + MovableObject> LPBox<T> {
         lpalloc::write_vtable(ptr as * mut u8, get_vtable(ptr.as_ref().unwrap()) as * mut u8);
         LPBox(NonNull::new_unchecked(ptr))
     }}
+}
 
+impl<T: ?Sized + MovableObject> LPBox<T> {
     pub fn from_box(value : alloc::boxed::Box<T>) -> Self{
-        LPBox(NonNull::new(alloc::boxed::Box::into_raw(value)).unwrap())
+        unsafe { LPBox(NonNull::new_unchecked(alloc::boxed::Box::into_raw(value))) }
     }
 
     #[cfg(any(feature = "has-lp-core", test))]
     pub fn write_to_lp(value : &T) -> * mut u8 { unsafe {
         if let Some(existing_lp_addr) = 
-            lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow().get_by_main(value as * const T as usize) {
+            lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow().get_by_main(value as *const T as * const () as usize) {
             return *existing_lp_addr as * mut u8;
         }
-        let ptr = lpalloc::lp_allocator_alloc(core::alloc::Layout::new::<T>()) as * mut u8;
+        let ptr = lpalloc::lp_allocator_alloc(core::alloc::Layout::for_value(value)) as * mut u8;
         value.move_to_lp(ptr);
         // ptr.copy_from(value, layout.size());
-        lpalloc::write_vtable(ptr as * mut u8, get_vtable(value) as * mut u8);
+        // TODO: write_vtable
+        // lpalloc::write_vtable(ptr as * mut u8, get_vtable(value) as * mut u8);
         lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow_mut().insert_no_drop(value as *const T as *mut T, ptr as usize);
         ptr
     }}
 
     #[cfg(any(feature = "has-lp-core", test))]
     pub fn get_moved_to_lp(&self) -> LPBox<T>{
-        unsafe { LPBox(NonNull::new_unchecked(Self::write_to_lp(self.0.as_ref()) as * mut T))}
+        unsafe { LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_lp(self.0.as_ref()) as usize)))}
     }
     #[cfg(any(feature = "has-lp-core", test))]
     pub fn get_moved_to_main(&self) -> LPBox<T> {
         unsafe {
             let addr =
-                lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow_mut().remove_by_lp(self.0.as_ptr() as * const () as usize)
-                    .map_or_else(|| lpbox_alloc(core::alloc::Layout::new::<T>()) as * mut T, |a| a as *mut T);
+                lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow_mut()
+                    .remove_by_lp(self.0.as_ptr() as * const () as usize)
+                    .map_or_else(|| lpbox_alloc(core::alloc::Layout::for_value(self.0.as_ref())) as usize,
+                        |a| a);
             self.0.as_ref().move_to_main(addr as * mut u8);
-            LPBox(NonNull::new_unchecked(addr))
+            LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(addr)))
         }
     }
     // call the main processor's function.
@@ -152,7 +157,7 @@ impl<T: Sized + MovableObject> LPBox<T> {
 }
 
 
-impl<T: MovableObject> MovableObject for LPBox<T> {
+impl<T: ?Sized + MovableObject> MovableObject for LPBox<T> {
     unsafe fn move_to_main(&self, dest: *mut u8) {
         unsafe { *(dest as *mut LPBox<T>) = self.get_moved_to_main(); }
     }

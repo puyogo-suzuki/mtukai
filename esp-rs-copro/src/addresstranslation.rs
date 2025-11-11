@@ -39,9 +39,9 @@ impl AddressTranslationTable {
         }
     }
 
+    // TODO: support unsized types.
     pub fn insert<T>(&mut self, main: *mut T, lp: usize) {
-        println!("AddressTranslationTable::insert: main {:p} lp {:x}", main, lp);
-        self.main_to_lp.insert(main as usize, lp);
+        self.main_to_lp.insert(main as * const () as usize, lp);
         if mem::needs_drop::<T>() {
             let foo = |v : *mut u8| unsafe{ptr::drop_in_place(v as *mut T)};
             self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::Droppable(main as usize, Box::new(foo)), copied: false });
@@ -50,9 +50,9 @@ impl AddressTranslationTable {
         }
     }
 
-    pub fn insert_no_drop<T>(&mut self, main: *mut T, lp: usize) {
-        self.main_to_lp.insert(main as usize, lp);
-        self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::NonDroppable(main as usize, unsafe{Layout::for_value_raw(main)}), copied: false });
+    pub fn insert_no_drop<T : ?Sized>(&mut self, main: *mut T, lp: usize) {
+        self.main_to_lp.insert(main as * const () as usize, lp);
+        self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::NonDroppable(main as * const() as usize, unsafe{Layout::for_value_raw(main)}), copied: false });
     }
 
     pub fn get_by_main(&self, main: usize) -> Option<&usize> {
