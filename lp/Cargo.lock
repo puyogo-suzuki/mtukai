@@ -85,6 +85,9 @@ checksum = "b18b1787dd3adea642fb529dd83fe558a08ace365bbaede4643a8959992900f4"
 [[package]]
 name = "esp-rs-copro"
 version = "0.1.0"
+dependencies = [
+ "esp-lp-hal",
+]
 
 [[package]]
 name = "esp-rs-copro-lp"
