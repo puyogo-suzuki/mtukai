@@ -85,6 +85,14 @@ pub(crate) fn remove_by_main(main: usize) -> Option<usize> {
     lpbox_static::remove_by_main(main)
 }
 
+pub fn new_array_uninitialized<T : MovableObject>(n : isize) ->  LPBox<[T]> {
+    unsafe {
+        let layout = core::alloc::Layout::array::<T>(n as usize).unwrap();
+        let ptr = lpalloc::lp_allocator_alloc(layout) as * mut T;
+        LPBox(NonNull::new_unchecked(core::ptr::slice_from_raw_parts_mut(ptr, n as usize)))
+    }
+} 
+
 impl<T: MovableObject, const N : usize> LPBox<[T;N]> {
     pub fn into_dynamic_slice(self) -> LPBox<[T]> {
         let original = mem::ManuallyDrop::new(self);
