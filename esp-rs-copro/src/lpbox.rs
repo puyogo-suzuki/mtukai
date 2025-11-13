@@ -175,13 +175,13 @@ impl<T: ?Sized + MovableObject> MovableObject for LPBox<T> {
     }
 }
 
-impl<T : MovableObject> Deref for LPBox<T> {
+impl<T : ?Sized + MovableObject> Deref for LPBox<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
         unsafe { self.0.as_ref() }
     }
 }
-impl<T : MovableObject> DerefMut for LPBox<T> {
+impl<T : ?Sized + MovableObject> DerefMut for LPBox<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.0.as_mut() }
     }
