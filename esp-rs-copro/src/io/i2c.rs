@@ -52,6 +52,10 @@ impl LPI2CError {
 }
 
 impl LPI2C {
+    #[cfg(feature = "has-lp-core")]
+    pub fn new(i2c : esp_hal::i2c::lp_i2c::LpI2c) -> Self { LPI2C { i2c } }
+    #[cfg(feature = "is-lp-core")]
+    pub fn new(i2c : esp_lp_hal::i2c::LpI2c) -> Self { LPI2C { i2c } }
     #[cfg(feature = "is-lp-core")]
     pub fn write(&mut self, address : u8, bytes : &[u8]) -> Result<(), LPI2CError> {
         LPI2CError::convert_from_result(self.i2c.write(address, bytes))
