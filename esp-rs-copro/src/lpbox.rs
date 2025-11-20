@@ -167,11 +167,11 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
 
 impl<T: ?Sized + MovableObject> MovableObject for LPBox<T> {
     unsafe fn move_to_main(&self, dest: *mut u8) {
-        unsafe { *(dest as *mut LPBox<T>) = self.get_moved_to_main(); }
+        unsafe { (dest as *mut LPBox<T>).write_volatile(self.get_moved_to_main()); }
     }
 
     unsafe fn move_to_lp(&self, dest: *mut u8) {
-        unsafe { *(dest as *mut LPBox<T>) = self.get_moved_to_lp(); }
+        unsafe { (dest as *mut LPBox<T>).write_volatile(self.get_moved_to_lp()); }
     }
 }
 
