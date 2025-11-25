@@ -1,4 +1,4 @@
-use core::{alloc::GlobalAlloc, fmt::Debug, mem, ops::{Deref, DerefMut}, ptr::NonNull};
+use core::{fmt::Debug, mem::{self, MaybeUninit}, ops::{Deref, DerefMut}, ptr::NonNull};
 
 use crate::movableobject::MovableObject;
 use crate::lpalloc;
