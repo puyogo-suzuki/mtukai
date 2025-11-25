@@ -87,9 +87,8 @@ pub(crate) fn remove_by_main(main: usize) -> Option<usize> {
 
 pub fn new_array_uninitialized<T : MovableObject>(n : isize) ->  LPBox<[T]> {
     unsafe {
-        let layout = core::alloc::Layout::array::<T>(n as usize).unwrap();
-        let ptr = lpalloc::lp_allocator_alloc(layout) as * mut T;
-        LPBox(NonNull::new_unchecked(core::ptr::slice_from_raw_parts_mut(ptr, n as usize)))
+        let b : alloc::boxed::Box<[MaybeUninit<T>]> = alloc::boxed::Box::new_uninit_slice(n as usize);
+        LPBox(NonNull::new_unchecked(alloc::boxed::Box::into_raw(b) as * mut [T]))
     }
 } 
 
