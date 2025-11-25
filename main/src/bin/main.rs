@@ -20,7 +20,7 @@ use esp_hal::{
     lp_core::{LpCore, LpCoreWakeupSource},
 };
 
-use esp_rs_copro_procmacro::load_lp_code2;
+use esp_rs_copro_procmacro::{define_lp_allocator, load_lp_code2};
 
 use esp_println::{print, println};
 
@@ -32,6 +32,8 @@ fn panic(_: &core::panic::PanicInfo) -> ! {
 // This creates a default app-descriptor required by the esp-idf bootloader.
 // For more information see: <https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-reference/system/app_image_format.html#application-description>
 esp_bootloader_esp_idf::esp_app_desc!();
+
+define_lp_allocator!();
 
 fn test_listcreate() -> TestList {
     TestList {
@@ -65,7 +67,8 @@ fn main() -> ! {
     // let delay = Delay::new();
 
     // configure GPIO 1 as LP output pin
-    let lp_pin = LowPowerOutput::new(peripherals.GPIO6);
+    let lp_pin = LowPowerOutput::new(peripherals.GPIO5);
+    let peripherals: esp_hal::peripherals::Peripherals = esp_hal::init(esp_hal::Config::default());
 
     let mut lp_core = LpCore::new(peripherals.LP_CORE);
     lp_core.stop();
@@ -74,13 +77,11 @@ fn main() -> ! {
     let lp_core_code = load_lp_code2!(
         "../lp/target/riscv32imac-unknown-none-elf/release/esp-rs-copro-lp"
     );
-
-    // start LP core
     {
         let mut test_list = test_listcreate();
         test_listprint(&test_list);
-        lp_core_code.run(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut test_list, lp_pin);
         println!("lpcore run!");
+        lp_core_code.run_light_sleep(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut Rtc::new(peripherals.LPWR), &mut test_list, lp_pin);
 
         let data = (0x5000_2000) as *mut u32;
         print!("Result {:x}           \u{000d}", unsafe {

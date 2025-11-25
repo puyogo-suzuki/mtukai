@@ -51,6 +51,23 @@ pub fn esp_rs_copro_statics(_attr: TokenStream) -> TokenStream {
     expanded.into()
 }
 
+#[cfg(any(feature = "has-lp-core", feature = "has-ulp-core", test))]
+#[proc_macro]
+pub fn define_lp_allocator(input: TokenStream) -> TokenStream {
+    quote!{
+        static mut lp_alloc_func : fn(layout: core::alloc::Layout) -> * mut u8 = |lay| {println!("illegal!"); 0 as * mut u8 };
+        static mut lp_dealloc_func : fn(pts : * mut u8, layout: core::alloc::Layout) -> () = |a, b| { };
+        #[unsafe(no_mangle)]
+        pub extern "Rust" fn __lpcoproc_allocator_alloc(layout: core::alloc::Layout) -> * mut u8 {
+            unsafe{lp_alloc_func(layout)}
+        }
+        #[unsafe(no_mangle)]
+        pub extern "Rust" fn __lpcoproc_allocator_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
+            unsafe{lp_dealloc_func(ptr, layout)};
+        }
+    }.into()
+}
+
 /// Load code to be run on the LP/ULP core.
 ///
 /// ## Example
@@ -173,6 +190,8 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         use #hal_crate::gpio::*;
         use #hal_crate::uart::lp_uart::LpUart;
         use #hal_crate::i2c::lp_i2c::LpI2c;
+        use #hal_crate::rtc_cntl::Rtc;
+        use #hal_crate::rtc_cntl::sleep::WakeFromLpCoreWakeupSource;
         #copro_crate_use;
     };
     #[cfg(feature = "has-ulp-core")]
@@ -190,6 +209,16 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
 
     let (transfer, transfer_back) = if let Some(a) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_TRANSFER")).map(|s| s.address()) {
         (quote!{
+            unsafe {
+                lp_alloc_func = |layout| { 
+                    use core::alloc::GlobalAlloc;
+                    unsafe { LpCoreCode::get_allocator().as_ref().unwrap().alloc(layout) }
+                }; 
+                lp_dealloc_func = |ptr, layout| {
+                    use core::alloc::GlobalAlloc;
+                    unsafe { LpCoreCode::get_allocator().as_ref().unwrap().dealloc(ptr, layout); }
+                };
+            }
             let trans = transfer_to_lp(transfer_value);
             unsafe {((#a) as *mut *mut u8).write_volatile(trans);}
         },
@@ -204,34 +233,6 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                 #addr as *mut ImplLPAllocator<#size>
             }
         }, quote!{
-            struct LPAllocator {}
-            static mut LPALLOCATOR : LPAllocator = LPAllocator {};
-            impl LPAllocator {
-                fn get_allocator() -> *mut ImplLPAllocator<#size> {
-                    #addr as *mut ImplLPAllocator<#size>
-                }
-            }
-            unsafe impl core::alloc::GlobalAlloc for LPAllocator {
-                unsafe fn alloc(&self, layout: core::alloc::Layout) -> *mut u8 {
-                    use core::alloc::GlobalAlloc;
-                    unsafe { LPAllocator::get_allocator().as_ref().unwrap().alloc(layout) }
-                }
-                unsafe fn dealloc(&self, ptr: *mut u8, layout: core::alloc::Layout) {
-                    use core::alloc::GlobalAlloc;
-                    unsafe { LPAllocator::get_allocator().as_ref().unwrap().dealloc(ptr, layout); }
-                }
-            }
-            #[unsafe(no_mangle)]
-            pub extern "Rust" fn __lpcoproc_allocator_alloc(layout: core::alloc::Layout) -> * mut u8 {
-                use core::alloc::GlobalAlloc;
-                unsafe { LPAllocator::get_allocator().as_ref().unwrap().alloc(layout) }
-            }
-            #[unsafe(no_mangle)]
-            pub extern "Rust" fn __lpcoproc_allocator_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
-                use core::alloc::GlobalAlloc;
-                unsafe { LPAllocator::get_allocator().as_ref().unwrap().dealloc(ptr, layout); }
-            }
-            unsafe impl Sync for LPAllocator {}
         })
     } else {(quote!{}, quote!())};
     let alloccall = if !allocfun.is_empty() {quote!{
@@ -259,19 +260,17 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
             #lpalloc
 
             impl LpCoreCode {
-                pub fn run<T : MovableObject>(
+                pub fn run_light_sleep<T : MovableObject>(
                     &self,
                     lp_core: &mut LpCore,
                     wakeup_source: LpCoreWakeupSource,
+                    rtc : &mut Rtc,
                     transfer_value : &mut T,
                     #(_: #args),*
                 ) {
                     #alloccall
                     lp_core.run(wakeup_source);
-                    { // FOR TESTING
-                        let delay = esp_hal::delay::Delay::new();
-                        delay.delay_millis(1000);
-                    }
+                    rtc.sleep_light(&[&WakeFromLpCoreWakeupSource::new()]);
                     #transfer_back
                 }
                 #allocfun
