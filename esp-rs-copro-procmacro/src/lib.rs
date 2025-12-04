@@ -80,7 +80,7 @@ pub fn define_lp_allocator(input: TokenStream) -> TokenStream {
 pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     use std::{fs, path::Path};
 
-    use object::{File, Object, ObjectSection, ObjectSymbol, Section, SectionKind};
+    use object::{File, Object, ObjectSection, ObjectSymbol, Section, SectionKind, SectionFlags};
     use parse::Error;
     use proc_macro::Span;
     use proc_macro_crate::{FoundCrate, crate_name};
@@ -120,17 +120,14 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     let bin_data = fs::read(elf_file).unwrap();
     let obj_file = File::parse(&*bin_data).unwrap();
     let sections = obj_file.sections();
-
+    println!("hello!");
     let mut sections: Vec<Section> = sections
         .into_iter()
         .filter(|section| {
-            matches!(
-                section.kind(),
-                SectionKind::Text
-                    | SectionKind::ReadOnlyData
-                    | SectionKind::Data
-                    | SectionKind::UninitializedData
-            )
+            match section.flags() {
+                SectionFlags::Elf{sh_flags: sh} => (sh & u64::from(object::elf::SHF_ALLOC)) != 0 ,
+                _ => false
+            }
         })
         .collect();
     sections.sort_by(|a, b| a.address().partial_cmp(&b.address()).unwrap());
@@ -141,6 +138,22 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     } else {
         0x0
     };
+
+    if sections.is_empty() {
+        return Error::new(
+            Span::call_site().into(),
+            "Given file doesn't seem to have any allocatable sections.",
+        )
+        .to_compile_error()
+        .into();
+    } else if sections[0].address() < last_address {
+        return Error::new(
+            Span::call_site().into(),
+            "Given file doesn't seem to be a valid LP/ULP core application.",
+        )
+        .to_compile_error()
+        .into();
+    }
 
     for section in sections {
         if section.address() > last_address {
