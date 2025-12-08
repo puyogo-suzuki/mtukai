@@ -5,6 +5,7 @@ pub mod lpalloc;
 pub mod lpbox;
 pub mod movableobject;
 pub mod io;
+pub mod prelude;
 #[cfg(any(feature = "has-lp-core", test))]
 mod addresstranslation;
 #[cfg(feature = "has-lp-core")]
