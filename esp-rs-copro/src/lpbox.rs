@@ -1,4 +1,5 @@
 use core::{fmt::Debug, mem::{self, MaybeUninit}, ops::{Deref, DerefMut}, ptr::NonNull};
+use core::ptr::copy_nonoverlapping;
 
 use crate::movableobject::MovableObject;
 use crate::lpalloc;
@@ -132,7 +133,8 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
             return *existing_lp_addr as * mut u8;
         }
         let ptr = lpalloc::lp_allocator_alloc(core::alloc::Layout::for_value(value)) as * mut u8;
-        value.move_to_lp(ptr);
+        copy_nonoverlapping(value as * const T as * const u8, ptr, core::mem::size_of_val(value));
+        value.rewrite_pointers_to_lp(ptr);
         // ptr.copy_from(value, layout.size());
         // TODO: write_vtable
         // lpalloc::write_vtable(ptr as * mut u8, get_vtable(value) as * mut u8);
@@ -152,7 +154,8 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
                     .remove_by_lp(self.0.as_ptr() as * const () as usize)
                     .map_or_else(|| lpbox_alloc(core::alloc::Layout::for_value(self.0.as_ref())) as usize,
                         |a| a);
-            self.0.as_ref().move_to_main(addr as * mut u8);
+            copy_nonoverlapping(self.0.as_ref() as * const T as * const u8, addr as * mut u8, core::mem::size_of_val(self.0.as_ref()));
+            self.0.as_ref().rewrite_pointers_to_main(addr as * mut u8);
             LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(addr)))
         }
     }
@@ -165,11 +168,11 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
 
 
 impl<T: ?Sized + MovableObject> MovableObject for LPBox<T> {
-    unsafe fn move_to_main(&self, dest: *mut u8) {
+    unsafe fn rewrite_pointers_to_main(&self, dest: *mut u8) {
         unsafe { (dest as *mut LPBox<T>).write_volatile(self.get_moved_to_main()); }
     }
 
-    unsafe fn move_to_lp(&self, dest: *mut u8) {
+    unsafe fn rewrite_pointers_to_lp(&self, dest: *mut u8) {
         unsafe { (dest as *mut LPBox<T>).write_volatile(self.get_moved_to_lp()); }
     }
 }
