@@ -53,7 +53,7 @@ pub fn esp_rs_copro_statics(_attr: TokenStream) -> TokenStream {
 
 #[cfg(any(feature = "has-lp-core", feature = "has-ulp-core", test))]
 #[proc_macro]
-pub fn define_lp_allocator(input: TokenStream) -> TokenStream {
+pub fn define_lp_allocator(_input: TokenStream) -> TokenStream {
     quote!{
         static mut lp_alloc_func : fn(layout: core::alloc::Layout) -> * mut u8 = |lay| {println!("illegal!"); 0 as * mut u8 };
         static mut lp_dealloc_func : fn(pts : * mut u8, layout: core::alloc::Layout) -> () = |a, b| { };
