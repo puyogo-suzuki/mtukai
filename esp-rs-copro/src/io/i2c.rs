@@ -2,8 +2,10 @@ use crate::movableobject::MovableObject;
 
 pub struct LPI2C {
     #[cfg(feature = "has-lp-core")]
+    #[allow(unused)]
     i2c : esp_hal::i2c::lp_i2c::LpI2c,
     #[cfg(feature = "is-lp-core")]
+    #[allow(unused)]
     i2c : esp_lp_hal::i2c::LpI2c,
 }
 
