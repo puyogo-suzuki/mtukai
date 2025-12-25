@@ -3,17 +3,18 @@
 use core::option::Option;
 use esp_rs_copro::{movableobject::MovableObject, lpbox::LPBox, io::i2c::LPI2C};
 
+#[derive(Clone, Copy)]
 pub struct TempAndHumid {
     pub temperature : i32,
     pub humidity : i32
 }
 
 impl MovableObject for TempAndHumid {
-    unsafe fn rewrite_pointers_to_main(&self, _dest : *mut u8) {
-        // Do nothing, TempAndHumid has no pointers.
+    unsafe fn move_to_main(&self, dest : *mut u8) {
+        unsafe{*(dest as *mut Self) = *self;}
     }
-    unsafe fn rewrite_pointers_to_lp(&self, _dest : *mut u8) {
-        // Do nothing, TempAndHumid has no pointers.
+    unsafe fn move_to_lp(&self, dest : *mut u8) {
+        unsafe{*(dest as *mut Self) = *self;}
     }
 }
 
@@ -35,16 +36,16 @@ pub struct MainLPParcel{
 }
 
 impl MovableObject for MainLPParcel {
-    unsafe fn rewrite_pointers_to_main(&self, dest : *mut u8) { unsafe {
+    unsafe fn move_to_main(&self, dest : *mut u8) { unsafe {
         let dest = dest as * mut MainLPParcel;
-        self.i2c.rewrite_pointers_to_main((&mut (*dest).i2c) as * mut LPI2C as * mut u8);
-        self.result.rewrite_pointers_to_main((&mut (*dest).result) as * mut LPBox<[TempAndHumid]> as * mut u8);
+        self.i2c.move_to_main((&mut (*dest).i2c) as * mut LPI2C as * mut u8);
+        self.result.move_to_main((&mut (*dest).result) as * mut LPBox<[TempAndHumid]> as * mut u8);
     }}
 
-    unsafe fn rewrite_pointers_to_lp(&self, dest : *mut u8) { unsafe {
+    unsafe fn move_to_lp(&self, dest : *mut u8) { unsafe {
         let dest = dest as * mut MainLPParcel;
-        self.i2c.rewrite_pointers_to_lp((&mut (*dest).i2c) as * mut LPI2C as * mut u8);
-        self.result.rewrite_pointers_to_lp((&mut (*dest).result) as * mut LPBox<[TempAndHumid]> as * mut u8);
+        self.i2c.move_to_lp((&mut (*dest).i2c) as * mut LPI2C as * mut u8);
+        self.result.move_to_lp((&mut (*dest).result) as * mut LPBox<[TempAndHumid]> as * mut u8);
     }}
 }
 
@@ -54,13 +55,15 @@ pub struct TestList {
 }
 
 impl MovableObject for TestList {
-    unsafe fn rewrite_pointers_to_main(&self, dest : *mut u8) { unsafe {
+    unsafe fn move_to_main(&self, dest : *mut u8) { unsafe {
         let dest = dest as * mut TestList;
-        self.next.rewrite_pointers_to_main((&mut (*dest).next) as * mut Option<LPBox<TestList>> as * mut u8);
+        self.next.move_to_main((&mut (*dest).next) as * mut Option<LPBox<TestList>> as * mut u8);
+        (*dest).value = self.value;
     }}
 
-    unsafe fn rewrite_pointers_to_lp(&self, dest : *mut u8) { unsafe {
+    unsafe fn move_to_lp(&self, dest : *mut u8) { unsafe {
         let dest = dest as * mut TestList;
-        self.next.rewrite_pointers_to_lp((&mut (*dest).next) as * mut Option<LPBox<TestList>> as * mut u8);
+        self.next.move_to_lp((&mut (*dest).next) as * mut Option<LPBox<TestList>> as * mut u8);
+        (*dest).value = self.value;
     }}
 }

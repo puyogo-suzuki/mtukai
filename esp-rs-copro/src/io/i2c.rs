@@ -76,11 +76,11 @@ impl LPI2C {
 }
 
 impl MovableObject for LPI2C {
-    unsafe fn rewrite_pointers_to_main(&self, _dest : *mut u8) {
+    unsafe fn move_to_main(&self, _dest : *mut u8) {
         // Do nothing, LPI2C is a zero sized type.
     }
 
-    unsafe fn rewrite_pointers_to_lp(&self, _dest : *mut u8) {
+    unsafe fn move_to_lp(&self, _dest : *mut u8) {
         // Do nothing, LPI2C is a zero sized type.
     }
 }
