@@ -1,5 +1,8 @@
 use crate::movableobject::MovableObject;
 
+/// A wrapper for low-power I2C peripheral that can be used in the LP core.
+/// This struct is a movable object and can be transferred between the main core and the LP core.
+/// It provides basic I2C operations such as read, write, and write_read.
 pub struct LPI2C {
     #[cfg(feature = "has-lp-core")]
     #[allow(unused)]
@@ -9,6 +12,7 @@ pub struct LPI2C {
     i2c : esp_lp_hal::i2c::LpI2c,
 }
 
+/// Possible errors that can occur during I2C operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LPI2CError {
     ExceedingFifo,
@@ -58,14 +62,17 @@ impl LPI2C {
     pub fn new(i2c : esp_hal::i2c::lp_i2c::LpI2c) -> Self { LPI2C { i2c } }
     #[cfg(feature = "is-lp-core")]
     pub fn new(i2c : esp_lp_hal::i2c::LpI2c) -> Self { LPI2C { i2c } }
+    /// Write data to the I2C device at the specified address.
     #[cfg(feature = "is-lp-core")]
     pub fn write(&mut self, address : u8, bytes : &[u8]) -> Result<(), LPI2CError> {
         LPI2CError::convert_from_result(self.i2c.write(address, bytes))
     }
+    /// Read data from the I2C device at the specified address.
     #[cfg(feature = "is-lp-core")]
     pub fn read(&mut self, address : u8, buffer : &mut [u8]) -> Result<(), LPI2CError> {
         LPI2CError::convert_from_result(self.i2c.read(address, buffer))
     }
+    /// Write data to the I2C device and then read data from it in a single transaction.
     #[cfg(feature = "is-lp-core")]
     pub fn write_read(
         &mut self,
