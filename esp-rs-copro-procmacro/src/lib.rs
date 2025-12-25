@@ -120,7 +120,6 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     let bin_data = fs::read(elf_file).unwrap();
     let obj_file = File::parse(&*bin_data).unwrap();
     let sections = obj_file.sections();
-    println!("hello!");
     let mut sections: Vec<Section> = sections
         .into_iter()
         .filter(|section| {
