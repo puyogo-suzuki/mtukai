@@ -325,7 +325,7 @@ pub fn movable_object_derive(input: TokenStream) -> TokenStream {
                 quote! {self.#name.wrap_move_to_lp( (&mut (*dest).#name) as * mut _ as * mut u8);}
             });
             let expanded = quote! {
-                impl MovableObject for #name {
+                impl #esp_copro_crate::movableobject::MovableObject for #name {
                     unsafe fn move_to_main(&self, dest : *mut u8) {
                         use #esp_copro_crate::movableobjectwrapper::*;
                         let dest = dest as * mut #name;
@@ -409,7 +409,7 @@ pub fn movable_object_derive(input: TokenStream) -> TokenStream {
                 gen_arm(&fname, v)
             });
             quote! {
-                impl MovableObject for #name {
+                impl #esp_copro_crate::movableobject::MovableObject for #name {
                     unsafe fn move_to_main(&self, dest : *mut u8) {
                         use #esp_copro_crate::movableobjectwrapper::*;
                         unsafe { (dest as * mut #name).write_volatile(match &self {

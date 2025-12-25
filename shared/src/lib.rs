@@ -1,7 +1,7 @@
 #![no_std]
 
 use core::option::Option;
-use esp_rs_copro::{movableobject::MovableObject, lpbox::LPBox, io::i2c::LPI2C};
+use esp_rs_copro::{lpbox::LPBox, io::i2c::LPI2C};
 
 #[derive(Clone, Copy, esp_rs_copro_procmacro::MovableObject)]
 pub struct TempAndHumid {
