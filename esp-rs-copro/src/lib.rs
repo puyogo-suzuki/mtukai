@@ -4,6 +4,7 @@ extern crate alloc;
 pub mod lpalloc;
 pub mod lpbox;
 pub mod movableobject;
+pub mod movableobjectwrapper;
 pub mod io;
 pub mod prelude;
 #[cfg(any(feature = "has-lp-core", test))]

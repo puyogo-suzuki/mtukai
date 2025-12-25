@@ -186,8 +186,7 @@ fn refresh_gpio() -> ! {
         delay.delay_millis(500);
     }}
 }
-
-#[main]
+#[esp_hal::main]
 fn main() -> ! {
     // generator version: 0.5.0
     esp_alloc::heap_allocator!(size: 72 * 1024);

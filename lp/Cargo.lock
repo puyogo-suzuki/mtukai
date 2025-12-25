@@ -262,6 +262,7 @@ name = "shared"
 version = "0.1.0"
 dependencies = [
  "esp-rs-copro",
+ "esp-rs-copro-procmacro",
 ]
 
 [[package]]

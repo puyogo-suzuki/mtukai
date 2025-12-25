@@ -4,6 +4,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::LitInt;
+use syn::{Data, DeriveInput};
 
 #[proc_macro]
 pub fn esp_rs_copro_statics(_attr: TokenStream) -> TokenStream {
@@ -293,3 +294,53 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     }
     .into()
 }
+
+#[proc_macro_derive(MovableObject)]
+pub fn movable_object_derive(input: TokenStream) -> TokenStream {
+    use syn::Ident;
+    use proc_macro::Span;
+    use proc_macro_crate::{FoundCrate, crate_name};
+
+    let input = syn::parse_macro_input!(input as DeriveInput);
+    let esp_copro_crate = if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-rs-copro") {
+        let ident = Ident::new(name, Span::call_site().into());
+        quote!{#ident}
+    } else { quote!{crate} };
+    match input.data {
+        Data::Struct(s) => {
+            let member_names = s.fields.iter().enumerate().map(|(i, f)| {
+                if let Some(ident) = &f.ident {
+                    quote! { #ident }
+                } else {
+                    let index = syn::Index::from(i);
+                    quote! { #index }
+                }
+            }).collect::<Vec<_>>();
+            let move_to_mains = member_names.iter().map(|name| {
+                quote! {self.#name.wrap_move_to_main( (&mut (*dest).#name) as * mut _ as * mut u8);}
+            });
+            let move_to_lps = member_names.iter().map(|name| {
+                quote! {self.#name.wrap_move_to_lp( (&mut (*dest).#name) as * mut _ as * mut u8);}
+            });
+            let name = input.ident;
+            let expanded = quote! {
+                impl MovableObject for #name {
+                    unsafe fn move_to_main(&self, dest : *mut u8) {
+                        use #esp_copro_crate::movableobjectwrapper::*;
+                        let dest = dest as * mut #name;
+                        #(#move_to_mains)*
+                    }
+                    unsafe fn move_to_lp(&self, dest : *mut u8) {
+                        use #esp_copro_crate::movableobjectwrapper::*;
+                        let dest = dest as * mut #name;
+                        #(#move_to_lps)*
+                    }
+                }
+            };
+            return TokenStream::from(expanded);
+        }
+        _ => {}
+    }
+    TokenStream::new()
+}
+
