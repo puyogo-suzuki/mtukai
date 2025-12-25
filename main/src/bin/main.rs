@@ -127,46 +127,6 @@ fn sht30_main() -> !{
     loop {}
 }
 
-// fn read_sht30<'a, b : DriverMode>(me : &mut I2c<'a, b>) -> Result<TempAndHumid, esp_hal::i2c::master::Error> {
-//     let delay = Delay::new();
-//     let addr = 0x44;
-//     let cmd = [0x2C, 0x06];
-//     let mut buffer = [0u8; 6];
-//     me.write(addr, &cmd)?;
-//     delay.delay_millis(10);
-//     me.read(addr, &mut buffer)?;
-//     let temp_raw = ((buffer[0] as u16) << 8) | (buffer[1] as u16);
-//     let hum_raw = ((buffer[3] as u16) << 8) | (buffer[4] as u16);
-//     let temperature = -4500 + ((17500 * (temp_raw as i32)) / 65535);
-//     let humidity = (10000 * (hum_raw as i32)) / 65535;
-//     Ok(TempAndHumid::new(temperature/100, humidity/100))
-// }
-
-// fn sht30_main_main() -> !{
-//     let peripherals = esp_hal::init(esp_hal::Config::default());
-//     let mut i2c = I2c::new(peripherals.I2C0, Config::default().with_frequency(Rate::from_khz(2)))
-//         .unwrap()
-//         .with_scl(peripherals.GPIO7)
-//         .with_sda(peripherals.GPIO6);
-//     Into::<esp_hal::gpio::interconnect::OutputSignal<'_>>::into(unsafe{GPIO7::steal()}).apply_output_config(
-//             &esp_hal::gpio::OutputConfig::default()
-//                 .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
-//                 .with_pull(esp_hal::gpio::Pull::None),
-//         );
-//     Into::<esp_hal::gpio::interconnect::OutputSignal<'_>>::into(unsafe{peripherals::GPIO6::steal()}).apply_output_config(
-//             &esp_hal::gpio::OutputConfig::default()
-//                 .with_drive_mode(esp_hal::gpio::DriveMode::OpenDrain)
-//                 .with_pull(esp_hal::gpio::Pull::None),
-//         );
-//     let val = (0..10).map(|_| {
-//         read_sht30(&mut i2c).inspect_err(|e| { println!("{:?}", e)}).unwrap_or(TempAndHumid { temperature: -999, humidity: -999 })
-//     });
-//     for i in val {
-//         println!("Temp: {} C, Hum: {} %", i.temperature, i.humidity);
-//     }
-//     loop {}
-// }
-
 fn refresh_gpio() -> ! {
     
     let peripherals = esp_hal::init(esp_hal::Config::default());
