@@ -297,15 +297,17 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
 
 #[proc_macro_derive(MovableObject)]
 pub fn movable_object_derive(input: TokenStream) -> TokenStream {
-    use syn::Ident;
+    use syn::{parse::Error, Ident};
     use proc_macro::Span;
     use proc_macro_crate::{FoundCrate, crate_name};
+    use syn::punctuated::Punctuated;
 
     let input = syn::parse_macro_input!(input as DeriveInput);
     let esp_copro_crate = if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-rs-copro") {
         let ident = Ident::new(name, Span::call_site().into());
         quote!{#ident}
     } else { quote!{crate} };
+    let name = &input.ident;
     match input.data {
         Data::Struct(s) => {
             let member_names = s.fields.iter().enumerate().map(|(i, f)| {
@@ -322,7 +324,6 @@ pub fn movable_object_derive(input: TokenStream) -> TokenStream {
             let move_to_lps = member_names.iter().map(|name| {
                 quote! {self.#name.wrap_move_to_lp( (&mut (*dest).#name) as * mut _ as * mut u8);}
             });
-            let name = input.ident;
             let expanded = quote! {
                 impl MovableObject for #name {
                     unsafe fn move_to_main(&self, dest : *mut u8) {
@@ -337,10 +338,99 @@ pub fn movable_object_derive(input: TokenStream) -> TokenStream {
                     }
                 }
             };
-            return TokenStream::from(expanded);
-        }
-        _ => {}
+            TokenStream::from(expanded)
+        },
+        Data::Enum(e) => {
+            let gen_fields_arm_unnamed = |fname_move_to : &Ident, name : &Ident, vname : &Ident, fields : &Punctuated<syn::Field, syn::token::Comma>| {
+                let field_names = fields.iter().enumerate().map(|(i, _)| {
+                    Ident::new(&format!("field_{}", i), Span::call_site().into())
+                }).collect::<Vec<_>>();
+                let dsts = fields.iter().enumerate().map(|(i, _)| {
+                    Ident::new(&format!("field_dst_{}", i), Span::call_site().into())
+                }).collect::<Vec<_>>();
+                let bufs = fields.iter().zip(dsts.iter()).map(|(f, ident)| {
+                    let ty = &f.ty;
+                    quote! { let mut #ident = core::mem::MaybeUninit::<#ty>::uninit(); }
+                });
+                let move_to_mains = field_names.iter().zip(dsts.iter()).map(|(src, dst)| {
+                    quote! { #src.#fname_move_to( (&mut #dst) as * mut _ as * mut u8); }
+                });
+                quote! {
+                    #name::#vname ( #(#field_names),* ) => {
+                        unsafe{
+                            #(#bufs)*
+                            #(#move_to_mains)*
+                            #name::#vname( #(#dsts.assume_init()),* )
+                        }
+                    },
+                }
+            };
+            let gen_fields_arm_named = |fname_move_to : &Ident, name : &Ident, vname : &Ident, fields : &Punctuated<syn::Field, syn::token::Comma>| {
+                let field_names = fields.iter().filter_map(|n| {
+                    n.ident.clone()
+                }).collect::<Vec<_>>();
+                let dsts = field_names.iter().map(|i| {
+                    Ident::new(&format!("field_dst_{}", i.to_string()), Span::call_site().into())
+                }).collect::<Vec<_>>();
+                let bufs = fields.iter().zip(dsts.iter()).map(|(f, ident)| {
+                    let ty = &f.ty;
+                    quote! { let mut #ident = core::mem::MaybeUninit::<#ty>::uninit(); }
+                });
+                let move_to_mains = field_names.iter().zip(dsts.iter()).map(|(src, dst)| {
+                    quote! { #src.#fname_move_to( (&mut #dst) as * mut _ as * mut u8); }
+                });
+                let constructions = field_names.iter().zip(dsts.iter()).map(|(src, dst)| {
+                    quote! { #src : #dst.assume_init() }
+                });
+                quote! {
+                    #name::#vname{#(#field_names),*} => {
+                        unsafe{
+                            #(#bufs)*
+                            #(#move_to_mains)*
+                            #name::#vname{ #(#constructions),* }
+                        }
+                    },
+                }
+            };
+            let gen_arm = |fname_move_to : &Ident, v : &syn::Variant| {
+                let vname = &v.ident;
+                match &v.fields {
+                    syn::Fields::Unit => { quote! { #name::#vname => { #name::#vname }, } },
+                    syn::Fields::Unnamed(fu) => { gen_fields_arm_unnamed(&fname_move_to, name, &vname, &fu.unnamed) },
+                    syn::Fields::Named(fn_) => { gen_fields_arm_named(&fname_move_to, name, &vname, &fn_.named) }
+                }
+            };
+            let fname = Ident::new("wrap_move_to_main", Span::call_site().into());
+            let arms_main = e.variants.iter().map(|v| {
+                gen_arm(&fname, v)
+            });
+            let fname = Ident::new("wrap_move_to_lp", Span::call_site().into());
+            let arms_lp = e.variants.iter().map(|v| {
+                gen_arm(&fname, v)
+            });
+            quote! {
+                impl MovableObject for #name {
+                    unsafe fn move_to_main(&self, dest : *mut u8) {
+                        use #esp_copro_crate::movableobjectwrapper::*;
+                        unsafe { (dest as * mut #name).write_volatile(match &self {
+                            #(#arms_main)*
+                        }); }
+                    }
+                    unsafe fn move_to_lp(&self, dest : *mut u8) {
+                        use #esp_copro_crate::movableobjectwrapper::*;
+                        unsafe { (dest as * mut #name).write_volatile(match &self {
+                            #(#arms_lp)*
+                        }); }
+                    }
+                }
+            }.into()
+        },
+        _ => Error::new(
+            Span::call_site().into(),
+            "Union types are not supported.",
+        )
+        .to_compile_error()
+        .into()
     }
-    TokenStream::new()
 }
 
