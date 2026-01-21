@@ -1,7 +1,6 @@
 use core::{alloc::Layout, mem, ptr};
 
 use alloc::{boxed::Box, collections::btree_map::BTreeMap};
-use crate::lpalloc;
 
 pub(crate) struct SetCopiedByLpResult {
     pub main_address : usize,
@@ -9,14 +8,14 @@ pub(crate) struct SetCopiedByLpResult {
 }
 
 pub(crate) enum AddressTranslationAddressValue {
-    Droppable(usize, Box<dyn Fn(*mut u8)>),
+    // Droppable(usize, Box<dyn Fn(*mut u8)>),
     NonDroppable(usize, Layout)
 }
 
 impl AddressTranslationAddressValue {
     pub fn get_addr(&self) -> usize {
         match self {
-            AddressTranslationAddressValue::Droppable(addr, _) => addr,
+            // AddressTranslationAddressValue::Droppable(addr, _) => addr,
             AddressTranslationAddressValue::NonDroppable(addr, _) => addr
         }.clone()
     }
@@ -39,20 +38,20 @@ impl AddressTranslationTable {
         }
     }
 
-    // TODO: support unsized types.
-    pub fn insert<T>(&mut self, main: *mut T, lp: usize) {
+    pub fn insert<T : ?Sized>(&mut self, main: *mut T, lp: usize) {
         self.main_to_lp.insert(main as * const () as usize, lp);
-        if mem::needs_drop::<T>() {
-            let foo = |v : *mut u8| unsafe{ptr::drop_in_place(v as *mut T)};
-            self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::Droppable(main as usize, Box::new(foo)), copied: false });
-        } else {
-            self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::NonDroppable(main as usize, unsafe{Layout::for_value_raw(main)}), copied: false });
-        }
+        // if mem::needs_drop::<T>() {
+        //     let foo = |v : *mut u8| unsafe{ptr::drop_in_place(v as *mut T)};
+        //     self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::Droppable(main as usize, Box::new(foo)), copied: false });
+        // } else {
+            self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::NonDroppable(main as *mut () as usize, unsafe{Layout::for_value_raw(main)}), copied: false });
+        // }
     }
 
     pub fn insert_no_drop<T : ?Sized>(&mut self, main: *mut T, lp: usize) {
-        self.main_to_lp.insert(main as * const () as usize, lp);
-        self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::NonDroppable(main as * const() as usize, unsafe{Layout::for_value_raw(main)}), copied: false });
+        self.insert(main, lp);
+        // self.main_to_lp.insert(main as * const () as usize, lp);
+        // self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::NonDroppable(main as *mut () as usize, unsafe{Layout::for_value_raw(main)}), copied: false });
     }
 
     pub fn get_by_main(&self, main: usize) -> Option<&usize> {
@@ -89,9 +88,9 @@ impl AddressTranslationTable {
         for e in self.lp_to_main.iter() {
             println!("Dropping lp_to_main entry lp addr {:x}", e.1.address.get_addr());
             match &e.1.address {
-                AddressTranslationAddressValue::Droppable(addr, drop_fn) => {
-                    drop_fn(*addr as *mut u8);
-                },
+                // AddressTranslationAddressValue::Droppable(addr, drop_fn) => {
+                //     drop_fn(*addr as *mut u8);
+                // },
                 AddressTranslationAddressValue::NonDroppable(addr, layout) => {
                     unsafe {
                         alloc::alloc::dealloc(*addr as * mut u8, *layout);
