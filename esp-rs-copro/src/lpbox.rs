@@ -103,7 +103,7 @@ impl<T: MovableObject, const N : usize> LPBox<[T;N]> {
     }
 }
 
-impl<T: Sized + MovableObject> LPBox<T> {
+impl<T: MovableObject> LPBox<T> {
     #[cfg(any(feature = "has-lp-core", test))]
     pub fn new(value: T) -> Self { unsafe {
         let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
@@ -123,6 +123,14 @@ impl<T: Sized + MovableObject> LPBox<T> {
 impl<T: ?Sized + MovableObject> LPBox<T> {
     pub fn from_box(value : alloc::boxed::Box<T>) -> Self{
         unsafe { LPBox(NonNull::new_unchecked(alloc::boxed::Box::into_raw(value))) }
+    }
+    pub fn from_raw(raw : * mut T) -> Self {
+        unsafe { LPBox(NonNull::new_unchecked(raw)) }
+    }
+
+    pub fn into_raw(self) -> * mut T {
+        let b = mem::ManuallyDrop::new(self);
+        b.0.as_ptr()
     }
 
     #[cfg(any(feature = "has-lp-core", test))]
