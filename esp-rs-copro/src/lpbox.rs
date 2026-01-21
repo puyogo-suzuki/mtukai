@@ -28,6 +28,16 @@ fn lpbox_alloc(l : core::alloc::Layout) -> *mut u8 {
 }
 
 #[cfg(any(feature = "has-lp-core", test))]
+pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
+    let addr : usize = ptr as *mut () as usize;
+    if addr >= 0x5000_0000 && addr < 0x5004_0000 {
+        unsafe{lpalloc::lp_allocator_dealloc(ptr, layout);} // lp coprocessor
+    } else {
+        unsafe{alloc::alloc::dealloc(ptr, layout);} // main processor
+    }
+}
+
+#[cfg(any(feature = "has-lp-core", test))]
 pub(crate) mod lpbox_static {
     use crate::addresstranslation::AddressTranslationTable;
     use core::cell::{RefMut, Ref, RefCell, Cell};
@@ -201,14 +211,9 @@ impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
             return;
         }
         unsafe{self.0.drop_in_place();}
-        let addr : usize = self.0.as_ptr() as *mut () as usize;
         let ptr = self.0.as_ptr() as * mut u8;
         let lay = unsafe {core::alloc::Layout::for_value(self.0.as_ref())};
-        if addr >= 0x5000_0000 && addr < 0x5004_0000 {
-            unsafe{lpalloc::lp_allocator_dealloc(ptr, lay);} // lp coprocessor
-        } else {
-            unsafe{alloc::alloc::dealloc(ptr, lay);} // main processor
-        }
+        lp_dealloc(ptr, lay);
     }
     #[cfg(not(any(feature = "has-lp-core", test)))]
     fn drop(&mut self) {
