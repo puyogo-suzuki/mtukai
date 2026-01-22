@@ -5,9 +5,10 @@ edition = "2024"
 
 [dependencies]
 esp-println = { version = "0.16.1", features = ["log-04"], optional = true }
-esp-lp-hal = { version = "0.3.0", features = ["esp32c6"], optional = true}
-esp-hal                = { version = "=1.0.0", features = ["esp32c6", "unstable", "log-04"], optional = true }
+esp-lp-hal = { version = "0.3.0", features = [], optional = true}
+esp-hal                = { version = "=1.0.0", features = ["unstable", "log-04"], optional = true }
 
 [features]
 is-lp-core = ["dep:esp-lp-hal"]
 has-lp-core = ["dep:esp-println", "dep:esp-hal"]
+esp32c6 = ["esp-lp-hal?/esp32c6", "esp-hal?/esp32c6"]
