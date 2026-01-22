@@ -196,10 +196,10 @@ impl<T : MovableObject> LPVec<T> {
     }
 
     fn reserve_exact(&mut self, additional : usize) {
-        self.try_reserve_exact(additional);
+        let _ = self.try_reserve_exact(additional);
     }
     pub fn reserve(&mut self, additional : usize) {
-        self.try_reserve(additional);
+        let _ = self.try_reserve(additional);
     }
 
     fn try_reserve_exact(&mut self, additional : usize) -> Result<(), LPTryReserveError> {
@@ -222,7 +222,7 @@ impl<T : MovableObject> LPVec<T> {
     pub fn shrink_to(&mut self, min_capacity : usize) {
         if min_capacity < self.capacity() {
             let new_capacity = core::cmp::max(self.len(), min_capacity);
-            self.vec_inner.grow_or_shrink(new_capacity, T::LAYOUT);
+            let _ = self.vec_inner.grow_or_shrink(new_capacity, T::LAYOUT);
         }
     }
 
