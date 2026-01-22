@@ -159,20 +159,23 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     }}
 
     #[cfg(any(feature = "has-lp-core", test))]
+    pub fn write_to_main(value : &T) -> * mut u8 { unsafe {
+        let addr =
+            lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow_mut()
+                .remove_by_lp(value as * const T as * const () as usize)
+                .map_or_else(|| lpbox_alloc(core::alloc::Layout::for_value(value)) as usize,
+                    |a| a);
+        value.move_to_main(addr as * mut u8);
+        addr as * mut u8
+    }}
+
+    #[cfg(any(feature = "has-lp-core", test))]
     pub fn get_moved_to_lp(&self) -> LPBox<T>{
         unsafe { LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_lp(self.0.as_ref()) as usize)))}
     }
     #[cfg(any(feature = "has-lp-core", test))]
     pub fn get_moved_to_main(&self) -> LPBox<T> {
-        unsafe {
-            let addr =
-                lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow_mut()
-                    .remove_by_lp(self.0.as_ptr() as * const () as usize)
-                    .map_or_else(|| lpbox_alloc(core::alloc::Layout::for_value(self.0.as_ref())) as usize,
-                        |a| a);
-            self.0.as_ref().move_to_main(addr as * mut u8);
-            LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(addr)))
-        }
+        unsafe { LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_main(self.0.as_ref()) as usize))) }
     }
     // call the main processor's function.
     #[cfg(not(any(feature = "has-lp-core", test)))]
