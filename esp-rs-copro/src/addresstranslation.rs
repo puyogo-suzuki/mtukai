@@ -19,6 +19,12 @@ impl AddressTranslationAddressValue {
             AddressTranslationAddressValue::NonDroppable(addr, _) => addr
         }.clone()
     }
+    pub fn get_layout(&self) -> Layout {
+        match self {
+            // AddressTranslationAddressValue::Droppable(addr, _) => addr,
+            AddressTranslationAddressValue::NonDroppable(_, layout) => layout
+        }.clone()
+    }
 }
 pub(crate) struct AddressTranslationEntry {
     pub address : AddressTranslationAddressValue,
@@ -75,12 +81,12 @@ impl AddressTranslationTable {
 
     /// Removes the entry by lp address, returning the main address if it existed
     /// This must be called by only LPBox.
-    pub fn remove_by_lp(&mut self, lp: usize) -> Option<usize> {
+    pub fn remove_by_lp(&mut self, lp: usize) -> Option<(usize, Layout)> {
         self.lp_to_main.remove(&lp).and_then(|main_entry| {
             let addr = main_entry.address.get_addr();
             // do not free here, just return the address.
             self.main_to_lp.remove(&addr);
-            Some(addr)
+            Some((addr, main_entry.address.get_layout()))
         })
     }
 

@@ -19,11 +19,19 @@ fn get_vtable(obj: &dyn MovableObject) -> *const u8 {
     }
 }
 
-fn lpbox_alloc(l : core::alloc::Layout) -> *mut u8 {
+pub(crate) fn lpbox_alloc(l : core::alloc::Layout) -> *mut u8 {
     unsafe {
         let ptr = alloc::alloc::alloc(l);
         if ptr.is_null() { alloc::alloc::handle_alloc_error(l); }
         ptr
+    }
+}
+
+pub(crate) fn lpbox_realloc(ptr : * mut u8, old_layout : core::alloc::Layout, new_size : usize) -> * mut u8 {
+    unsafe {
+        let new_ptr = alloc::alloc::realloc(ptr, old_layout, new_size);
+        if new_ptr.is_null() { alloc::alloc::handle_alloc_error(old_layout); }
+        new_ptr
     }
 }
 
@@ -164,7 +172,7 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
             lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow_mut()
                 .remove_by_lp(value as * const T as * const () as usize)
                 .map_or_else(|| lpbox_alloc(core::alloc::Layout::for_value(value)) as usize,
-                    |a| a);
+                    |a| a.0);
         value.move_to_main(addr as * mut u8);
         addr as * mut u8
     }}

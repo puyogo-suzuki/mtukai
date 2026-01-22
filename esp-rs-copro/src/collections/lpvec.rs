@@ -12,7 +12,7 @@ use crate::{lpbox::LPBox, movableobject::MovableObject};
 type Cap = core::num::niche_types::UsizeNoHighBit;
 
 pub struct LPVec<T : MovableObject> {
-    pub(crate) vec_inner : LPVecInner,
+    vec_inner : LPVecInner,
     len : usize,
     _marker : PhantomData<T>
 }
@@ -922,19 +922,60 @@ impl<T : MovableObject, const N: usize> LPVec<[T; N]> {
 }
 
 impl<T : MovableObject> MovableObject for LPVec<T> {
+    #[cfg(any(feature = "has-lp-core", test))]
     unsafe fn move_to_main(&self, dest : *mut u8) {
+        let dest = dest as * mut Self;
+        let dst_ptr = crate::lpbox::LPBox::<[T]>::write_to_main(self.as_slice());
+        unsafe {
+            dest.write_volatile(LPVec {
+                vec_inner : LPVecInner::from_raw_parts(dst_ptr as * mut u8, self.capacity()),
+                len : self.len(),
+                _marker : PhantomData
+            });
+        }
+    }
+    #[cfg(not(any(feature = "has-lp-core", test)))]
+    unsafe fn move_to_main(&self, dest : *mut u8) {
+        unimplemented!()
     }
 
+    #[cfg(any(feature = "has-lp-core", test))]
     unsafe fn move_to_lp(&self, dest : *mut u8) {
-        todo!()
+        let dest = dest as * mut Self;
+        let dst_ptr = unsafe {
+            let src = self.as_slice();
+            let (mut addr, lay) =
+                crate::lpbox::lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow_mut()
+                    .remove_by_lp(src as * const [T] as * const () as usize)
+                    .map_or_else(|| {
+                            let lay = core::alloc::Layout::for_value(src);
+                            (crate::lpbox::lpbox_alloc(lay) as usize, lay)
+                        },
+                        |a| a);
+            // Check the layout is unmodified
+            if lay != core::alloc::Layout::for_value(src) {
+                // extend the main's.
+                addr = crate::lpbox::lpbox_realloc(addr as * mut u8, lay, core::alloc::Layout::for_value(src).size()) as usize;
+            }
+            src.move_to_main(addr as * mut u8);
+            addr as * mut u8
+        };
+        unsafe {
+            dest.write_volatile(LPVec {
+                vec_inner : LPVecInner::from_raw_parts(dst_ptr as * mut u8, self.capacity()),
+                len : self.len(),
+                _marker : PhantomData
+            });
+        }
+    }
+    #[cfg(not(any(feature = "has-lp-core", test)))]
+    unsafe fn move_to_lp(&self, dest : *mut u8) {
+        unimplemented!()
     }
 }
 
 impl<T : MovableObject> Drop for LPVec<T> {
     fn drop(&mut self) {
-        if needs_drop::<T>() {
-            // TODO : drop all elements.
-        }
         unsafe { ptr::drop_in_place(ptr::slice_from_raw_parts_mut(self.as_mut_ptr(), self.len)); }
         self.vec_inner.deallocate(T::LAYOUT);
     }
