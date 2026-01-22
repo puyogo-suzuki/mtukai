@@ -3,9 +3,14 @@
 /// Copyright (c) The Rust Project Contributors.
 /// https://github.com/rust-lang/rust
 
-use core::{alloc::{Layout, LayoutError}, fmt, intrinsics, iter, marker::PhantomData, mem::{self, ManuallyDrop, MaybeUninit, SizedTypeProperties, needs_drop}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull, Unique}, slice::SliceIndex};
+use core::{alloc::{Layout, LayoutError}, slice, fmt, intrinsics, iter, marker::PhantomData, mem::{self, ManuallyDrop, MaybeUninit, SizedTypeProperties, needs_drop}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull, Unique}, slice::SliceIndex};
 
-use alloc::{boxed::Box, slice, vec::Splice};
+#[cfg(not(test))]
+use alloc::alloc;
+#[cfg(not(test))]
+use ::alloc::boxed::Box;
+#[cfg(test)]
+use std::{alloc, boxed::Box};
 
 use crate::{lpbox::LPBox, movableobject::MovableObject};
 
@@ -81,9 +86,9 @@ impl LPVecInner {
         if let Some(new_layout) = Self::layout_array(new_elem_count, elem_layout) {
             let new_ptr = unsafe { 
                 if self.ptr.as_ptr().is_null() {
-                    alloc::alloc::alloc(new_layout)
+                    alloc::alloc(new_layout)
                 } else {
-                    alloc::alloc::realloc(self.ptr.as_ptr(), self.current_memory(elem_layout), new_layout.size())
+                    alloc::realloc(self.ptr.as_ptr(), self.current_memory(elem_layout), new_layout.size())
                 }
             };
             if new_ptr.is_null() {
@@ -102,7 +107,7 @@ impl LPVecInner {
     }
     #[cfg(not(any(feature = "has-lp-core", test)))]
     fn deallocate(&mut self, elem_layout : Layout) {
-        unsafe { alloc::alloc::dealloc(self.ptr.as_ptr(), self.current_memory(elem_layout)); }
+        unsafe { alloc::dealloc(self.ptr.as_ptr(), self.current_memory(elem_layout)); }
     }
 
     const unsafe fn from_raw_parts(ptr : * mut u8, capacity : usize) -> Self {

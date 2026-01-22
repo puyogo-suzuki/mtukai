@@ -1,4 +1,4 @@
-#[cfg(any(feature = "is-lp-core", test))]
+#[cfg(feature = "is-lp-core")]
 pub fn lp_core_halt() -> ! {
     use esp_lp_hal::pac;
 

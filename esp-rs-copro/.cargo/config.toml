@@ -1,5 +1,6 @@
 [build]
 target = "riscv32imac-unknown-none-elf"
 
-[unstable]
-build-std = ["core", "alloc", "compiler_builtins"]
+[alias]
+hosttest = "test --target x86_64-pc-windows-msvc"
+t = "test --target x86_64-pc-windows-msvc"

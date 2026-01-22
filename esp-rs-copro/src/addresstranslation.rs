@@ -1,6 +1,9 @@
 use core::{alloc::Layout, mem, ptr};
 
-use alloc::{boxed::Box, collections::btree_map::BTreeMap};
+#[cfg(not(test))]
+use alloc::{alloc, boxed::Box, collections::btree_map::BTreeMap};
+#[cfg(test)]
+use std::{alloc, collections::btree_map::BTreeMap};
 
 pub(crate) struct SetCopiedByLpResult {
     pub main_address : usize,
@@ -92,14 +95,13 @@ impl AddressTranslationTable {
 
     pub fn drop_and_clear(&mut self) {
         for e in self.lp_to_main.iter() {
-            println!("Dropping lp_to_main entry lp addr {:x}", e.1.address.get_addr());
             match &e.1.address {
                 // AddressTranslationAddressValue::Droppable(addr, drop_fn) => {
                 //     drop_fn(*addr as *mut u8);
                 // },
                 AddressTranslationAddressValue::NonDroppable(addr, layout) => {
                     unsafe {
-                        alloc::alloc::dealloc(*addr as * mut u8, *layout);
+                        alloc::dealloc(*addr as * mut u8, *layout);
                     }
                 }
             }

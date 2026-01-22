@@ -2,6 +2,12 @@ use core::{fmt::Debug, mem::{self, MaybeUninit}, ops::{Deref, DerefMut}, ptr::No
 
 use crate::movableobject::MovableObject;
 use crate::lpalloc;
+#[cfg(not(test))]
+use alloc::alloc;
+#[cfg(not(test))]
+use ::alloc::boxed::Box;
+#[cfg(test)]
+use std::alloc;
 
 pub struct LPBox<T: ?Sized + MovableObject>(pub(crate) NonNull<T>);
 
@@ -21,16 +27,16 @@ fn get_vtable(obj: &dyn MovableObject) -> *const u8 {
 
 pub(crate) fn lpbox_alloc(l : core::alloc::Layout) -> *mut u8 {
     unsafe {
-        let ptr = alloc::alloc::alloc(l);
-        if ptr.is_null() { alloc::alloc::handle_alloc_error(l); }
+        let ptr = alloc::alloc(l);
+        if ptr.is_null() { alloc::handle_alloc_error(l); }
         ptr
     }
 }
 
 pub(crate) fn lpbox_realloc(ptr : * mut u8, old_layout : core::alloc::Layout, new_size : usize) -> * mut u8 {
     unsafe {
-        let new_ptr = alloc::alloc::realloc(ptr, old_layout, new_size);
-        if new_ptr.is_null() { alloc::alloc::handle_alloc_error(old_layout); }
+        let new_ptr = alloc::realloc(ptr, old_layout, new_size);
+        if new_ptr.is_null() { alloc::handle_alloc_error(old_layout); }
         new_ptr
     }
 }
@@ -41,7 +47,7 @@ pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
     if crate::constants::in_lp_range(addr) {
         unsafe{lpalloc::lp_allocator_dealloc(ptr, layout);} // lp coprocessor
     } else {
-        unsafe{alloc::alloc::dealloc(ptr, layout);} // main processor
+        unsafe{alloc::dealloc(ptr, layout);} // main processor
     }
 }
 
@@ -105,8 +111,8 @@ pub(crate) fn remove_by_main(main: usize) -> Option<usize> {
 
 pub fn new_array_uninitialized<T : MovableObject>(n : isize) ->  LPBox<[T]> {
     unsafe {
-        let b : alloc::boxed::Box<[MaybeUninit<T>]> = alloc::boxed::Box::new_uninit_slice(n as usize);
-        LPBox(NonNull::new_unchecked(alloc::boxed::Box::into_raw(b) as * mut [T]))
+        let b : Box<[MaybeUninit<T>]> = Box::new_uninit_slice(n as usize);
+        LPBox(NonNull::new_unchecked(Box::into_raw(b) as * mut [T]))
     }
 } 
 
@@ -139,8 +145,8 @@ impl<T: MovableObject> LPBox<T> {
 }
 
 impl<T: ?Sized + MovableObject> LPBox<T> {
-    pub fn from_box(value : alloc::boxed::Box<T>) -> Self{
-        unsafe { LPBox(NonNull::new_unchecked(alloc::boxed::Box::into_raw(value))) }
+    pub fn from_box(value : Box<T>) -> Self{
+        unsafe { LPBox(NonNull::new_unchecked(Box::into_raw(value))) }
     }
     pub fn from_raw(raw : * mut T) -> Self {
         unsafe { LPBox(NonNull::new_unchecked(raw)) }
@@ -233,7 +239,7 @@ impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
         let lay = unsafe {core::alloc::Layout::for_value(self.0.as_ref())};
         if crate::constants::in_lp_range(addr) {
             unsafe{self.0.drop_in_place();}
-            unsafe{alloc::alloc::dealloc(ptr, lay);} // lp processor
+            unsafe{alloc::dealloc(ptr, lay);} // lp processor
         } else {
             // do not drop, as it is on the main coprocessor
         }

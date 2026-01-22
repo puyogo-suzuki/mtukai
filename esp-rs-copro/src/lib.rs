@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 #![feature(layout_for_ptr)]
 #![feature(ptr_internals)]
 #![feature(temporary_niche_types)]
@@ -15,6 +15,7 @@
 #![feature(cast_maybe_uninit)]
 #![feature(trusted_len)]
 #![feature(exact_size_is_empty)]
+#[cfg(not(test))]
 extern crate alloc;
 pub mod lpalloc;
 pub mod lpbox;
@@ -29,8 +30,6 @@ mod addresstranslation;
 #[cfg(feature = "has-lp-core")]
 #[macro_use]
 extern crate esp_println;
-
-// use alloc::alloc::Allocator;
 
 #[cfg(any(feature = "has-lp-core", test))]
 pub mod transfer_functions {
