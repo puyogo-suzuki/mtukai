@@ -3,7 +3,7 @@
 /// Copyright (c) The Rust Project Contributors.
 /// https://github.com/rust-lang/rust
 
-use core::{alloc::{Layout, LayoutError}, slice, fmt, intrinsics, iter, marker::PhantomData, mem::{self, ManuallyDrop, MaybeUninit, SizedTypeProperties, needs_drop}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull, Unique}, slice::SliceIndex};
+use core::{alloc::Layout, slice, fmt, intrinsics, iter, marker::PhantomData, mem::{self, ManuallyDrop, MaybeUninit, SizedTypeProperties}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull, Unique}, slice::SliceIndex};
 
 #[cfg(not(test))]
 use alloc::alloc;
@@ -940,7 +940,7 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
         }
     }
     #[cfg(not(any(feature = "has-lp-core", test)))]
-    unsafe fn move_to_main(&self, dest : *mut u8) {
+    unsafe fn move_to_main(&self, _dest : *mut u8) {
         unimplemented!()
     }
 
@@ -974,7 +974,7 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
         }
     }
     #[cfg(not(any(feature = "has-lp-core", test)))]
-    unsafe fn move_to_lp(&self, dest : *mut u8) {
+    unsafe fn move_to_lp(&self, _dest : *mut u8) {
         unimplemented!()
     }
 }

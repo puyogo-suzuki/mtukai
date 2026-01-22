@@ -16,6 +16,6 @@ pub(crate) fn in_lp_range(addr : usize) -> bool {
     (addr.wrapping_sub(LP_ADDRESS_BASE)) < LP_ADDRESS_LEN
 }
 #[cfg(not(any(feature = "esp32c6", test)))]
-pub(crate) fn in_lp_range(addr : usize) -> bool {
+pub(crate) fn in_lp_range(_addr : usize) -> bool {
     false
 }

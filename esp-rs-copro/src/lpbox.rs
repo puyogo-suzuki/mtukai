@@ -1,7 +1,6 @@
 use core::{fmt::Debug, mem::{self, MaybeUninit}, ops::{Deref, DerefMut}, ptr::NonNull};
 
 use crate::movableobject::MovableObject;
-use crate::lpalloc;
 #[cfg(not(test))]
 use alloc::alloc;
 #[cfg(not(test))]

@@ -96,7 +96,7 @@ unsafe impl<const SIZE : usize> GlobalAlloc for ImplLPAllocator<SIZE> {
         }
     }
 
-    unsafe fn dealloc(&self, ptr : *mut u8, layout: Layout) {
+    unsafe fn dealloc(&self, ptr : *mut u8, _layout: Layout) {
         unsafe {
             let header = (ptr as usize - core::mem::size_of::<BlockHeader>()) as * mut BlockHeader;
             // Coalesce with previous block if free
