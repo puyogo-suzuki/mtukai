@@ -191,7 +191,7 @@ impl<T : MovableObject> LPVec<T> {
     }
 
     #[inline]
-    const fn capacity(&self) -> usize {
+    pub const fn capacity(&self) -> usize {
         if T::IS_ZST { usize::MAX } else { self.vec_inner.capacity() }
     }
 
@@ -200,14 +200,14 @@ impl<T : MovableObject> LPVec<T> {
         self.len() + additional > self.capacity()
     }
 
-    fn reserve_exact(&mut self, additional : usize) {
+    pub fn reserve_exact(&mut self, additional : usize) {
         let _ = self.try_reserve_exact(additional);
     }
     pub fn reserve(&mut self, additional : usize) {
         let _ = self.try_reserve(additional);
     }
 
-    fn try_reserve_exact(&mut self, additional : usize) -> Result<(), LPTryReserveError> {
+    pub fn try_reserve_exact(&mut self, additional : usize) -> Result<(), LPTryReserveError> {
         self.vec_inner.grow_or_shrink(additional + self.len(), T::LAYOUT)
     }
     pub fn try_reserve(&mut self, additional : usize) -> Result<(), LPTryReserveError>{
