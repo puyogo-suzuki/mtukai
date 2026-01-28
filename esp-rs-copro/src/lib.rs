@@ -19,6 +19,7 @@
 extern crate alloc;
 pub mod lpalloc;
 pub mod lpbox;
+pub mod lpadapter;
 pub mod movableobject;
 pub mod movableobjectwrapper;
 pub mod io;
