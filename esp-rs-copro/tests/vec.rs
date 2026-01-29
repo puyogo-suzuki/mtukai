@@ -15,12 +15,8 @@ impl Drop for DropCount<'_> {
     }
 }
 impl MovableObject for DropCount<'_> {
-    unsafe fn move_to_main(&self, dest : *mut u8) {
-        
-    }
-
-    unsafe fn move_to_lp(&self, dest : *mut u8) {
-    }
+    unsafe fn move_to_main(&self, dest : *mut u8) {}
+    unsafe fn move_to_lp(&self, dest : *mut u8) {}
 }
 
 #[test]
@@ -59,4 +55,26 @@ fn test_reserve() {
 #[test]
 fn test_zst_capacity() {
     assert_eq!(LPVec::<LPAdapter<()>>::new().capacity(), usize::MAX);
-}    
+}
+
+#[test]
+fn test_indexing() {
+    let v: LPVec<LPAdapter<isize>> = vec![10, 20].into();
+    assert_eq!(v[0], 10.into());
+    assert_eq!(v[1], 20.into());
+    let mut x: usize = 0;
+    assert_eq!(v[x], 10.into());
+    assert_eq!(v[x + 1], 20.into());
+    x = x + 1;
+    assert_eq!(v[x], 20.into());
+    assert_eq!(v[x - 1], 10.into());
+}
+
+#[test]
+fn test_debug_fmt() {
+    let vec1: LPVec<LPAdapter<isize>> = LPVec::new();
+    assert_eq!("[]", format!("{:?}", vec1));
+
+    let vec2: LPVec<LPAdapter<isize>> = vec![0, 1].into();
+    assert_eq!("[LPAdapter { inner: 0 }, LPAdapter { inner: 1 }]", format!("{:?}", vec2));
+}

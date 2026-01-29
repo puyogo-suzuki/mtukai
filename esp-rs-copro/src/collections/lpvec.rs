@@ -4,10 +4,10 @@
 /// https://github.com/rust-lang/rust
 
 use core::{alloc::Layout, slice, fmt, intrinsics, iter, marker::PhantomData, mem::{self, ManuallyDrop, MaybeUninit, SizedTypeProperties}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull, Unique}, slice::SliceIndex};
-use crate::{lpbox::LPBox, movableobject::MovableObject};
+use crate::{lpadapter::LPAdapter, lpbox::LPBox, movableobject::MovableObject};
 
 #[cfg(feature = "nottest")]
-use ::alloc::{alloc, boxed::Box};
+use ::alloc::{alloc, boxed::Box, vec::Vec};
 #[cfg(not(feature = "nottest"))]
 use std::{alloc, boxed::Box};
 
@@ -1047,6 +1047,20 @@ impl<T : MovableObject> AsRef<[T]> for LPVec<T> {
 impl<T : MovableObject> AsMut<[T]> for LPVec<T> {
     fn as_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
+    }
+}
+
+impl<T : MovableObject> From<Vec<T>> for LPVec<T> {
+    fn from(s: Vec<T>) -> LPVec<T> {
+        let (buf, len, cap) = s.into_raw_parts();
+        unsafe { LPVec::from_raw_parts(buf, len, cap) }
+    }
+}
+
+impl<T : Copy> From<Vec<T>> for LPVec<LPAdapter<T>> {
+    fn from(s: Vec<T>) -> LPVec<LPAdapter<T>> {
+        let (buf, len, cap) = s.into_raw_parts();
+        unsafe { LPVec::from_raw_parts(buf as *mut LPAdapter<T>, len, cap) }
     }
 }
 
