@@ -4,15 +4,12 @@
 /// https://github.com/rust-lang/rust
 
 use core::{alloc::Layout, slice, fmt, intrinsics, iter, marker::PhantomData, mem::{self, ManuallyDrop, MaybeUninit, SizedTypeProperties}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull, Unique}, slice::SliceIndex};
-
-#[cfg(not(test))]
-use alloc::alloc;
-#[cfg(not(test))]
-use ::alloc::boxed::Box;
-#[cfg(test)]
-use std::{alloc, boxed::Box};
-
 use crate::{lpbox::LPBox, movableobject::MovableObject};
+
+#[cfg(feature = "nottest")]
+use ::alloc::{alloc, boxed::Box};
+#[cfg(not(feature = "nottest"))]
+use std::{alloc, boxed::Box};
 
 type Cap = core::num::niche_types::UsizeNoHighBit;
 
@@ -101,12 +98,11 @@ impl LPVecInner {
             Err(LPTryReserveError::CapacityOverflow)
         }
     }
-    #[cfg(any(feature = "has-lp-core", test))]
+
     fn deallocate(&mut self, elem_layout : Layout) {
+        #[cfg(feature = "has-lp-core")]
         crate::lpbox::lp_dealloc(self.ptr.as_ptr(), unsafe{self.current_memory(elem_layout)});
-    }
-    #[cfg(not(any(feature = "has-lp-core", test)))]
-    fn deallocate(&mut self, elem_layout : Layout) {
+        #[cfg(any(feature = "is-lp-core", not(feature = "nottest")))]
         unsafe { alloc::dealloc(self.ptr.as_ptr(), self.current_memory(elem_layout)); }
     }
 
@@ -927,7 +923,7 @@ impl<T : MovableObject, const N: usize> LPVec<[T; N]> {
 }
 
 impl<T : MovableObject> MovableObject for LPVec<T> {
-    #[cfg(any(feature = "has-lp-core", test))]
+    #[cfg(feature = "has-lp-core")]
     unsafe fn move_to_main(&self, dest : *mut u8) {
         let dest = dest as * mut Self;
         let dst_ptr = crate::lpbox::LPBox::<[T]>::write_to_main(self.as_slice());
@@ -939,12 +935,12 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
             });
         }
     }
-    #[cfg(not(any(feature = "has-lp-core", test)))]
+    #[cfg(not(feature = "has-lp-core"))]
     unsafe fn move_to_main(&self, _dest : *mut u8) {
         unimplemented!()
     }
 
-    #[cfg(any(feature = "has-lp-core", test))]
+    #[cfg(feature = "has-lp-core")]
     unsafe fn move_to_lp(&self, dest : *mut u8) {
         let dest = dest as * mut Self;
         let dst_ptr = unsafe {
@@ -973,7 +969,7 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
             });
         }
     }
-    #[cfg(not(any(feature = "has-lp-core", test)))]
+    #[cfg(not(feature = "has-lp-core"))]
     unsafe fn move_to_lp(&self, _dest : *mut u8) {
         unimplemented!()
     }

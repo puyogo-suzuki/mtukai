@@ -1,0 +1,26 @@
+{
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "test-mod ",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--package", "esp-rs-copro"
+                ],
+                "filter": {
+                    "name": "all_test",
+                    "kind": "test"
+                },
+                "cwd": "${workspaceFolder}/esp-rs-copro"
+            },
+            "cwd": "${workspaceFolder}/esp-rs-copro",
+            "sourceMap": {},
+            "sourceLanguages": [
+                "rust"
+            ]
+        }
+    ]
+}

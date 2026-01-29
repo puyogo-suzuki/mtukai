@@ -1,6 +1,0 @@
-[build]
-target = "riscv32imac-unknown-none-elf"
-
-[alias]
-hosttest = "test --target x86_64-pc-windows-msvc"
-t = "test --target x86_64-pc-windows-msvc"

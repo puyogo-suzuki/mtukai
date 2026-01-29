@@ -2,12 +2,12 @@ use core::{fmt::Debug, mem::{self, MaybeUninit}, ops::{Deref, DerefMut}, ptr::No
 
 use crate::movableobject::MovableObject;
 use crate::lpalloc;
-#[cfg(not(test))]
+#[cfg(feature = "nottest")]
 use alloc::alloc;
-#[cfg(not(test))]
+#[cfg(feature = "nottest")]
 use ::alloc::boxed::Box;
-#[cfg(test)]
-use std::alloc;
+#[cfg(not(feature = "nottest"))]
+use std::{alloc, boxed::Box};
 
 pub struct LPBox<T: ?Sized + MovableObject>(pub(crate) NonNull<T>);
 
@@ -41,7 +41,7 @@ pub(crate) fn lpbox_realloc(ptr : * mut u8, old_layout : core::alloc::Layout, ne
     }
 }
 
-#[cfg(any(feature = "has-lp-core", test))]
+#[cfg(feature = "has-lp-core")]
 pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
     let addr : usize = ptr as *mut () as usize;
     if crate::constants::in_lp_range(addr) {
@@ -51,7 +51,12 @@ pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
     }
 }
 
-#[cfg(any(feature = "has-lp-core", test))]
+#[cfg(not(feature = "nottest"))]
+pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
+    unsafe{alloc::dealloc(ptr, layout);} // main processor
+}
+
+#[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
 pub(crate) mod lpbox_static {
     use crate::addresstranslation::AddressTranslationTable;
     use core::cell::{RefMut, Ref, RefCell, Cell};
@@ -100,11 +105,11 @@ pub(crate) mod lpbox_static {
     }
 }
 
-#[cfg(any(feature = "has-lp-core", test))]
+#[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
 pub fn cleanup() {
     lpbox_static::cleanup();
 }
-#[cfg(any(feature = "has-lp-core", test))]
+#[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
 pub(crate) fn remove_by_main(main: usize) -> Option<usize> {
     lpbox_static::remove_by_main(main)
 }
@@ -128,7 +133,7 @@ impl<T: MovableObject, const N : usize> LPBox<[T;N]> {
 }
 
 impl<T: MovableObject> LPBox<T> {
-    #[cfg(any(feature = "has-lp-core", test))]
+    #[cfg(not(feature = "is-lp-core"))]
     pub fn new(value: T) -> Self { unsafe {
         let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
         ptr.write(value);
@@ -157,7 +162,7 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
         b.0.as_ptr()
     }
 
-    #[cfg(any(feature = "has-lp-core", test))]
+    #[cfg(feature = "has-lp-core")]
     pub fn write_to_lp(value : &T) -> * mut u8 { unsafe {
         if let Some(existing_lp_addr) = 
             lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow().get_by_main(value as *const T as * const () as usize) {
@@ -172,7 +177,7 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
         ptr
     }}
 
-    #[cfg(any(feature = "has-lp-core", test))]
+    #[cfg(feature = "has-lp-core")]
     pub fn write_to_main(value : &T) -> * mut u8 { unsafe {
         let addr =
             lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow_mut()
@@ -183,18 +188,18 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
         addr as * mut u8
     }}
 
-    #[cfg(any(feature = "has-lp-core", test))]
+    #[cfg(feature = "has-lp-core")]
     pub fn get_moved_to_lp(&self) -> LPBox<T>{
         unsafe { LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_lp(self.0.as_ref()) as usize)))}
     }
-    #[cfg(any(feature = "has-lp-core", test))]
+    #[cfg(feature = "has-lp-core")]
     pub fn get_moved_to_main(&self) -> LPBox<T> {
         unsafe { LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_main(self.0.as_ref()) as usize))) }
     }
     // call the main processor's function.
-    #[cfg(not(any(feature = "has-lp-core", test)))]
+    #[cfg(any(feature = "is-lp-core", not(feature = "nottest")))]
     pub fn get_moved_to_lp(&self) -> LPBox<T>{ todo!(); }
-    #[cfg(not(any(feature = "has-lp-core", test)))]
+    #[cfg(any(feature = "is-lp-core", not(feature = "nottest")))]
     pub fn get_moved_to_main(&self) -> LPBox<T> { todo!(); }
 }
 
@@ -222,7 +227,7 @@ impl<T : ?Sized + MovableObject> DerefMut for LPBox<T> {
 }
 
 impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
-    #[cfg(any(feature = "has-lp-core", test))]
+    #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     fn drop(&mut self) {
         if !lpbox_static::check_lpbox_drop_enable() {
             return;
@@ -232,7 +237,7 @@ impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
         let lay = unsafe {core::alloc::Layout::for_value(self.0.as_ref())};
         lp_dealloc(ptr, lay);
     }
-    #[cfg(not(any(feature = "has-lp-core", test)))]
+    #[cfg(feature = "is-lp-core")]
     fn drop(&mut self) {
         let addr : usize = self.0.as_ptr() as *mut () as usize;
         let ptr = self.0.as_ptr() as * mut u8;

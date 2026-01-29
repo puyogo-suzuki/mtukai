@@ -1,6 +1,5 @@
 use core::{alloc::{GlobalAlloc, Layout}, cell::UnsafeCell, mem::MaybeUninit, ptr::null_mut};
 
-
 pub struct ImplLPAllocator<const SIZE : usize> {
     pub free_ptr: UnsafeCell<*mut BlockHeader>,
     pub heap : [MaybeUninit<u8>; SIZE]
@@ -51,7 +50,7 @@ pub unsafe fn write_vtable(ptr: * mut u8, vtable: * mut u8) {
 
 struct FreeBlock { next: * mut BlockHeader }
 
-#[cfg(any(feature = "has-lp-core", test))]
+#[cfg(feature = "has-lp-core")]
 unsafe extern "Rust" {
     #[link_name = "__lpcoproc_allocator_alloc"]
     pub(crate) fn lp_allocator_alloc(layout: Layout) -> * mut u8;

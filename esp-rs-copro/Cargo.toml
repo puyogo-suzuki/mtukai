@@ -12,6 +12,7 @@ esp-hal     = { version = "=1.0.0", features = ["unstable", "log-04"], optional 
 
 [features]
 default = []
-is-lp-core = ["dep:esp-lp-hal"]
-has-lp-core = ["dep:esp-println", "dep:esp-hal"]
+nottest = []
+is-lp-core = ["dep:esp-lp-hal", "nottest"]
+has-lp-core = ["dep:esp-println", "dep:esp-hal", "nottest"]
 esp32c6 = ["esp-lp-hal?/esp32c6", "esp-hal?/esp32c6"]

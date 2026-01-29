@@ -1,8 +1,8 @@
 use core::{alloc::Layout, mem, ptr};
 
-#[cfg(not(test))]
-use alloc::{alloc, boxed::Box, collections::btree_map::BTreeMap};
-#[cfg(test)]
+#[cfg(feature = "nottest")]
+use ::alloc::{alloc, boxed::Box, collections::btree_map::BTreeMap};
+#[cfg(not(feature = "nottest"))]
 use std::{alloc, collections::btree_map::BTreeMap};
 
 pub(crate) struct SetCopiedByLpResult {
