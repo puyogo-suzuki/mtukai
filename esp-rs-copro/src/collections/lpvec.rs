@@ -74,15 +74,13 @@ impl LPVecInner {
     }
     pub(crate) fn grow_or_shrink(&mut self, new_elem_count : usize, elem_layout : Layout) -> Result<(), LPTryReserveError> {
         if new_elem_count == 0 || elem_layout.size() == 0 {
-            if !self.ptr.as_ptr().is_null() {
-                self.deallocate(unsafe { self.current_memory(elem_layout) });
-            }
+            self.deallocate(elem_layout);
             self.set_ptr_and_cap(Unique::dangling(), 0);
             return Ok(());
         }
         if let Some(new_layout) = Self::layout_array(new_elem_count, elem_layout) {
             let new_ptr = unsafe { 
-                if self.ptr.as_ptr().is_null() {
+                if self.capacity() == 0 {
                     alloc::alloc(new_layout)
                 } else {
                     alloc::realloc(self.ptr.as_ptr(), self.current_memory(elem_layout), new_layout.size())
@@ -100,10 +98,12 @@ impl LPVecInner {
     }
 
     fn deallocate(&mut self, elem_layout : Layout) {
+        let layout = unsafe { self.current_memory(elem_layout) };
+        if layout.size() == 0 { return; }
         #[cfg(feature = "has-lp-core")]
-        crate::lpbox::lp_dealloc(self.ptr.as_ptr(), unsafe{self.current_memory(elem_layout)});
+        crate::lpbox::lp_dealloc(self.ptr.as_ptr(), layout);
         #[cfg(any(feature = "is-lp-core", not(feature = "nottest")))]
-        unsafe { alloc::dealloc(self.ptr.as_ptr(), self.current_memory(elem_layout)); }
+        unsafe { alloc::dealloc(self.ptr.as_ptr(), layout); }
     }
 
     const unsafe fn from_raw_parts(ptr : * mut u8, capacity : usize) -> Self {
