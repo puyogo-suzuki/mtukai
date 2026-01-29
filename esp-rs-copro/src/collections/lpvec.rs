@@ -31,14 +31,14 @@ pub enum LPTryReserveError {
 }
 
 impl LPVecInner {
-    const fn new() -> Self {
+    const fn new(layout : Layout) -> Self {
         LPVecInner {
-            ptr : Unique::dangling(),
+            ptr : Unique::from_non_null(layout.dangling_ptr()),
             capacity : Cap::new(0).unwrap()
         }
     }
     fn try_with_capacity(capacity : usize, elem_layout : Layout) -> Option<Self> {
-        let mut ret = LPVecInner::new();
+        let mut ret = LPVecInner::new(elem_layout);
         ret.grow_or_shrink(capacity, elem_layout).ok().map(|_| ret)
     }
     fn with_capacity_zerod(capacity : usize, elem_layout : Layout) -> Option<Self> {
@@ -129,7 +129,7 @@ impl<T : MovableObject> LPVec<T> {
     #[inline]
     pub const fn new() -> Self {
         LPVec {
-            vec_inner : LPVecInner::new(),
+            vec_inner : LPVecInner::new(T::LAYOUT),
             len : 0,
             _marker : PhantomData
         }
