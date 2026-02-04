@@ -1013,6 +1013,18 @@ impl<T : MovableObject, const N: usize> TryFrom<LPVec<T>> for [T; N] {
     }
 }
 
+impl<T : Copy, const N: usize> TryFrom<LPVec<LPAdapter<T>>> for [T; N] {
+    type Error = LPVec<LPAdapter<T>>;
+
+    fn try_from(mut vec: LPVec<LPAdapter<T>>) -> Result<[T; N], LPVec<LPAdapter<T>>> {
+        if vec.len() != N {
+            return Err(vec);
+        }
+        unsafe { vec.set_len(0) };
+        let array = unsafe { ptr::read(vec.as_ptr() as *const [T; N]) };
+        Ok(array)
+    }
+}
 
 impl<T : MovableObject> const Default for LPVec<T> {
     fn default() -> LPVec<T> {
@@ -1047,6 +1059,22 @@ impl<T : MovableObject> AsRef<[T]> for LPVec<T> {
 impl<T : MovableObject> AsMut<[T]> for LPVec<T> {
     fn as_mut(&mut self) -> &mut [T] {
         self.as_mut_slice()
+    }
+}
+
+impl<T : Copy> AsRef<[T]> for LPVec<LPAdapter<T>> {
+    fn as_ref(&self) -> &[T] {
+        unsafe {
+            slice::from_raw_parts(self.as_ptr() as *const T, self.len())
+        }
+    }
+}
+
+impl<T : Copy> AsMut<[T]> for LPVec<LPAdapter<T>> {
+    fn as_mut(&mut self) -> &mut [T] {
+        unsafe {
+            slice::from_raw_parts_mut(self.as_mut_ptr() as *mut T, self.len())
+        }
     }
 }
 
@@ -1183,7 +1211,7 @@ impl<T : MovableObject, I: SliceIndex<[T]>> IndexMut<I> for LPVec<T> {
 
 macro_rules! __impl_slice_eq1 {
     ([$($vars:tt)*] $lhs:ty, $rhs:ty $(where $ty:ty: $bound:ident)?) => {
-        impl<T, U : MovableObject, $($vars)*> PartialEq<$rhs> for $lhs
+        impl<T, $($vars)*> PartialEq<$rhs> for $lhs
         where
             T: PartialEq<U> + MovableObject, // T and U must implement MovableObject
             $($ty: $bound)?
@@ -1196,15 +1224,15 @@ macro_rules! __impl_slice_eq1 {
     }
 }
 
-__impl_slice_eq1! { [] LPVec<T>, LPVec<U> }
-__impl_slice_eq1! { [] LPVec<T>, &[U] }
-__impl_slice_eq1! { [] LPVec<T>, &mut [U] }
-__impl_slice_eq1! { [] &[T], LPVec<U> }
-__impl_slice_eq1! { [] &mut [T], LPVec<U> }
-__impl_slice_eq1! { [] LPVec<T>, [U]  }
-__impl_slice_eq1! { [] [T], LPVec<U>  }
-__impl_slice_eq1! { [const N: usize] LPVec<T>, [U; N] }
-__impl_slice_eq1! { [const N: usize] LPVec<T>, &[U; N] }
+__impl_slice_eq1! { [U : MovableObject] LPVec<T>, LPVec<U> }
+__impl_slice_eq1! { [U] LPVec<T>, &[U] }
+__impl_slice_eq1! { [U] LPVec<T>, &mut [U] }
+__impl_slice_eq1! { [U : MovableObject] &[T], LPVec<U> }
+__impl_slice_eq1! { [U : MovableObject] &mut [T], LPVec<U> }
+__impl_slice_eq1! { [U] LPVec<T>, [U]  }
+__impl_slice_eq1! { [U : MovableObject] [T], LPVec<U>  }
+__impl_slice_eq1! { [const N: usize, U] LPVec<T>, [U; N] }
+__impl_slice_eq1! { [const N: usize, U] LPVec<T>, &[U; N] }
 
 impl<T: PartialOrd + MovableObject> PartialOrd for LPVec<T>
 {
