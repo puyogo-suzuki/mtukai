@@ -23,7 +23,7 @@ impl MovableObject for DropCount<'_> {
 fn test_double_drop() {
     let (mut count_x, mut count_y) = (0, 0);
     {
-        let mut tv = (Vec::new(), Vec::new());
+        let mut tv = (LPVec::new(), LPVec::new());
         tv.0.push(DropCount { count: &mut count_x });
         tv.1.push(DropCount { count: &mut count_y });
 
@@ -60,14 +60,14 @@ fn test_zst_capacity() {
 #[test]
 fn test_indexing() {
     let v: LPVec<LPAdapter<isize>> = vec![10, 20].into();
-    assert_eq!(v[0], 10.into());
-    assert_eq!(v[1], 20.into());
+    assert_eq!(v[0], 10);
+    assert_eq!(v[1], 20);
     let mut x: usize = 0;
-    assert_eq!(v[x], 10.into());
-    assert_eq!(v[x + 1], 20.into());
+    assert_eq!(v[x], 10);
+    assert_eq!(v[x + 1], 20);
     x = x + 1;
-    assert_eq!(v[x], 20.into());
-    assert_eq!(v[x - 1], 10.into());
+    assert_eq!(v[x], 20);
+    assert_eq!(v[x - 1], 10);
 }
 
 #[test]
@@ -77,4 +77,91 @@ fn test_debug_fmt() {
 
     let vec2: LPVec<LPAdapter<isize>> = vec![0, 1].into();
     assert_eq!("[LPAdapter { inner: 0 }, LPAdapter { inner: 1 }]", format!("{:?}", vec2));
+}
+
+#[test]
+fn test_push() {
+    let mut v : LPVec<LPAdapter<isize>> = LPVec::new();
+    v.push(1.into());
+    assert_eq!(v, [1]);
+    v.push(2.into());
+    assert_eq!(v, [1, 2]);
+    v.push(3.into());
+    assert_eq!(v, [1, 2, 3]);
+}
+
+// #[test]
+// fn test_extend() {
+//     let mut v: LPVec<LPAdapter<i32>> = LPVec::new();
+//     let mut w: LPVec<LPAdapter<i32>> = LPVec::new();
+
+//     v.extend(w.clone());
+//     assert_eq!(v, &[]);
+
+//     v.extend(0..3);
+//     for i in 0..3 {
+//         w.push(i.into())
+//     }
+
+//     assert_eq!(v, w);
+
+//     v.extend(3..10);
+//     for i in 3..10 {
+//         w.push(i.into())
+//     }
+
+//     assert_eq!(v, w);
+
+//     v.extend(w.clone()); // specializes to `append`
+//     assert!(v.iter().eq(w.iter().chain(w.iter())));
+
+//     // Zero sized types
+//     #[derive(PartialEq, Debug)]
+//     struct Foo;
+//     impl MovableObject for Foo {
+//         unsafe fn move_to_main(&self, dest : *mut u8) {}
+//         unsafe fn move_to_lp(&self, dest : *mut u8) {}
+//     }
+
+//     let mut a = LPVec::new();
+//     let b = vec![Foo, Foo].into();
+
+//     a.extend(b);
+//     assert_eq!(a, &[Foo, Foo]);
+
+//     // Double drop
+//     let mut count_x = 0;
+//     {
+//         let mut x = LPVec::new();
+//         let y : LPVec<DropCount> = vec![DropCount { count: &mut count_x }].into();
+//         x.extend(y);
+//     }
+//     assert_eq!(count_x, 1);
+// }
+
+#[test]
+fn test_extend_from_slice() {
+    let a: LPVec<LPAdapter<isize>> = vec![1, 2, 3, 4, 5].into();
+    let b: LPVec<LPAdapter<isize>> = vec![6, 7, 8, 9, 0].into();
+
+    let mut v: LPVec<LPAdapter<isize>> = a;
+
+    v.extend_from_slice(&b);
+
+    assert_eq!(v, [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]);
+}
+
+#[test]
+fn test_extend_ref() {
+    let mut v: LPVec<LPAdapter<isize>> = vec![1, 2].into();
+    v.extend_from_slice(&[LPAdapter::from(3), LPAdapter::from(4), LPAdapter::from(5)]);
+
+    assert_eq!(v.len(), 5);
+    assert_eq!(v, [1, 2, 3, 4, 5]);
+
+    let w: LPVec<LPAdapter<isize>> = vec![6, 7].into();
+    v.extend_from_slice(&w);
+
+    assert_eq!(v.len(), 7);
+    assert_eq!(v, [1, 2, 3, 4, 5, 6, 7]);
 }
