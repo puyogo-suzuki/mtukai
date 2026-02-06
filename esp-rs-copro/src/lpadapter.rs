@@ -2,19 +2,20 @@ use core::{ops::{Deref, DerefMut}, ptr};
 
 use crate::movableobject::MovableObject;
 
-#[derive(Debug, Clone, Copy, Default, Hash)]
+
+#[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LPAdapter<T> where T : Copy {
     inner: T
 }
 
-impl<T : Copy + PartialEq<U>, U> PartialEq<U> for LPAdapter<T> {
-    fn eq(&self, other: &U) -> bool {
-        &self.inner == other
+impl<T: Copy + PartialEq> PartialEq<T> for LPAdapter<T> {
+    fn eq(&self, other: &T) -> bool {
+        self.inner == *other
     }
 }
 
-impl<T : Copy + PartialOrd<U>, U> PartialOrd<U> for LPAdapter<T> {
-    fn partial_cmp(&self, other: &U) -> Option<core::cmp::Ordering> {
+impl<T: Copy + PartialOrd> PartialOrd<T> for LPAdapter<T> {
+    fn partial_cmp(&self, other: &T) -> Option<core::cmp::Ordering> {
         self.inner.partial_cmp(other)
     }
 }
