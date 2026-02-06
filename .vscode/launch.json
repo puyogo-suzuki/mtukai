@@ -11,7 +11,7 @@
                     "--package", "esp-rs-copro"
                 ],
                 "filter": {
-                    "name": "all_test",
+                    "name": "vec",
                     "kind": "test"
                 },
                 "cwd": "${workspaceFolder}/esp-rs-copro"
