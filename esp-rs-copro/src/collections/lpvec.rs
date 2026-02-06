@@ -147,7 +147,7 @@ impl<T : MovableObject> LPVec<T> {
     #[inline]
     pub const unsafe fn from_raw_parts(ptr : * mut T, len : usize, capacity : usize) -> Self {
         LPVec {
-            vec_inner : unsafe { LPVecInner::from_raw_parts(ptr as * mut u8, capacity) },
+            vec_inner : unsafe { LPVecInner::from_raw_parts(ptr as * mut u8, if T::IS_ZST {0} else {capacity}) },
             len : len,
             _marker : PhantomData
         }
@@ -156,7 +156,7 @@ impl<T : MovableObject> LPVec<T> {
     #[inline]
     pub unsafe fn from_parts(ptr : NonNull<T>, len : usize, capacity : usize) -> Self {
         LPVec {
-            vec_inner : unsafe { LPVecInner::from_raw_parts(ptr.as_ptr() as * mut u8, capacity) },
+            vec_inner : unsafe { LPVecInner::from_raw_parts(ptr.as_ptr() as * mut u8, if T::IS_ZST {0} else {capacity}) },
             len : len,
             _marker : PhantomData
         }
@@ -670,7 +670,7 @@ impl<T : MovableObject> LPVec<T> {
         let ptr = self.as_mut_ptr();
         let spare_ptr = unsafe { ptr.add(self.len) };
         let spare_ptr = spare_ptr.cast_uninit();
-        let spare_len = self.vec_inner.capacity() - self.len;
+        let spare_len = self.capacity() - self.len;
 
         unsafe {
             let initialized = slice::from_raw_parts_mut(ptr, self.len);
@@ -1106,8 +1106,28 @@ impl<T: Clone + MovableObject> From<&[T]> for LPVec<T> {
     }
 }
 
+impl<T: Copy> From<&[T]> for LPVec<LPAdapter<T>> {
+    fn from(s: &[T]) -> LPVec<LPAdapter<T>> {
+        unsafe {
+            let len = s.len();
+            let mut v : LPVec<LPAdapter<T>> = LPVec::try_with_capacity(len).unwrap();
+            v.len = len;
+            for i in 0..len {
+                ptr::write(v.as_mut_ptr().add(i) as * mut T, *(s.get_unchecked(i)));
+            }
+            v
+        }
+    }
+}
+
 impl<T: Clone + MovableObject> From<&mut [T]> for LPVec<T> {
     fn from(s: &mut [T]) -> LPVec<T> {
+        Self::from(s as &[T])
+    }
+}
+
+impl<T: Copy> From<&mut [T]> for LPVec<LPAdapter<T>> {
+    fn from(s: &mut [T]) -> LPVec<LPAdapter<T>> {
         Self::from(s as &[T])
     }
 }
@@ -1118,8 +1138,20 @@ impl<T: Clone + MovableObject, const N: usize> From<&[T; N]> for LPVec<T> {
     }
 }
 
+impl<T: Copy, const N: usize> From<&[T; N]> for LPVec<LPAdapter<T>> {
+    fn from(s: &[T; N]) -> LPVec<LPAdapter<T>> {
+        Self::from(s.as_slice())
+    }
+}
+
 impl<T: Clone + MovableObject, const N: usize> From<&mut [T; N]> for LPVec<T> {
     fn from(s: &mut [T; N]) -> LPVec<T> {
+        Self::from(s.as_mut_slice())
+    }
+}
+
+impl<T: Copy, const N: usize> From<&mut [T; N]> for LPVec<LPAdapter<T>> {
+    fn from(s: &mut [T; N]) -> LPVec<LPAdapter<T>> {
         Self::from(s.as_mut_slice())
     }
 }
@@ -1129,6 +1161,17 @@ impl<T : MovableObject, const N: usize> From<[T; N]> for LPVec<T> {
         unsafe {
             let mut ret = LPVec::<T>::try_with_capacity(s.len()).unwrap();
             ret.as_mut_ptr().copy_from_nonoverlapping(&s as *const [T; N] as *const T, s.len());
+            ret.set_len(s.len());
+            ret
+        }
+    }
+}
+
+impl<T : Copy, const N: usize> From<[T; N]> for LPVec<LPAdapter<T>> {
+    fn from(s: [T; N]) -> LPVec<LPAdapter<T>> {
+        unsafe {
+            let mut ret = LPVec::<LPAdapter<T>>::try_with_capacity(s.len()).unwrap();
+            ret.as_mut_ptr().copy_from_nonoverlapping(&s as *const [T; N] as *const LPAdapter<T>, s.len());
             ret.set_len(s.len());
             ret
         }
