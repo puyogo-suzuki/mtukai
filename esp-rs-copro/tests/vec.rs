@@ -168,12 +168,10 @@ fn test_extend_ref() {
     assert_eq!(v, [1, 2, 3, 4, 5, 6, 7]);
 }
 
-
-/*
 #[test]
 fn test_retain() {
     let mut vec: LPVec<LPAdapter<i32>> = vec![1, 2, 3, 4].into();
-    vec.retain(|x| x.inner % 2 == 0);
+    vec.retain(|x| **x % 2 == 0);
     assert_eq!(vec, [2, 4]);
 }
 
@@ -184,7 +182,7 @@ fn test_retain_predicate_order() {
         let mut vec: LPVec<LPAdapter<i32>> = vec![1, 2, 3, 4].into();
         let mut next_expected = 1;
         vec.retain(|x| {
-            assert_eq!(next_expected, x.inner);
+            assert_eq!(next_expected, **x);
             next_expected += 1;
             number_of_executions += 1;
             to_keep
@@ -193,6 +191,7 @@ fn test_retain_predicate_order() {
     }
 }
 
+/*
 #[test]
 #[cfg_attr(not(panic = "unwind"), ignore = "test requires unwinding support")]
 fn test_retain_pred_panic_with_hole() {
