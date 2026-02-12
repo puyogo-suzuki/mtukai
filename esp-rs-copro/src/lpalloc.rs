@@ -72,7 +72,8 @@ pub(crate) fn get_lp_mem_begin_and_len() -> (usize, usize) {
 }
 
 
-pub fn in_lp_mem_range(addr : usize) -> bool {
+pub fn in_lp_mem_range<T>(addr : * const T) -> bool {
+    let addr = addr as * const () as usize;
     let (base, len) = get_lp_mem_begin_and_len();
     addr.wrapping_sub(base) < len
 }

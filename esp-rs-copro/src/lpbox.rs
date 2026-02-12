@@ -43,8 +43,7 @@ pub(crate) fn lpbox_realloc(ptr : * mut u8, old_layout : core::alloc::Layout, ne
 
 #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
 pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
-    let addr : usize = ptr as *mut () as usize;
-    if lpalloc::in_lp_mem_range(addr) {
+    if lpalloc::in_lp_mem_range(ptr) {
         unsafe{lpalloc::lp_allocator_dealloc(ptr, layout);} // lp coprocessor
     } else {
         unsafe{alloc::dealloc(ptr, layout);} // main processor
@@ -283,10 +282,9 @@ impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
     }
     #[cfg(feature = "is-lp-core")]
     fn drop(&mut self) {
-        let addr : usize = self.0.as_ptr() as *mut () as usize;
         let ptr = self.0.as_ptr() as * mut u8;
         let lay = unsafe {core::alloc::Layout::for_value(self.0.as_ref())};
-        if lpalloc::in_lp_mem_range(addr) {
+        if lpalloc::in_lp_mem_range(ptr) {
             unsafe{self.0.drop_in_place();}
             unsafe{alloc::dealloc(ptr, lay);} // lp processor
         } else {
