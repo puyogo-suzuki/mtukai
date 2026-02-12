@@ -15,7 +15,7 @@ impl<const SIZE : usize> ImplLPAllocator<SIZE> {
 }
 impl<const SIZE : usize> ImplLPAllocator<SIZE> {
     pub fn init(&mut self) { unsafe{
-        let head = self.heap.as_mut_ptr().cast::<BlockHeader>();
+        let head = self.heap.as_mut_ptr() as *mut BlockHeader;
         *(self.free_ptr.get_mut()) = head;
         BlockHeader::init_header_value(head, self.heap.len(), null_mut(), null_mut(), null_mut());
         let fb : * mut FreeBlock = self.heap.as_mut_ptr().byte_add(core::mem::size_of::<BlockHeader>()) as * mut FreeBlock;
@@ -57,6 +57,31 @@ unsafe extern "Rust" {
 
     #[link_name = "__lpcoproc_allocator_dealloc"]
     pub(crate) fn lp_allocator_dealloc(ptr: * mut u8, layout: Layout);
+}
+
+#[cfg(not(feature = "nottest"))]
+use std::cell::RefCell;
+
+#[cfg(not(feature = "nottest"))]
+thread_local! {
+    static GLOBAL_LP_ALLOCATOR : RefCell<ImplLPAllocator<4096>> = RefCell::new(ImplLPAllocator::new());
+}
+#[cfg(not(feature = "nottest"))]
+pub fn lp_allocator_init() {
+    GLOBAL_LP_ALLOCATOR.with_borrow_mut(|a| a.init());
+}
+
+#[cfg(not(feature = "nottest"))]
+pub(crate) fn lp_allocator_alloc(layout: Layout) -> * mut u8 {
+    unsafe { GLOBAL_LP_ALLOCATOR.with_borrow(|a| a.alloc(layout)) }
+}
+#[cfg(not(feature = "nottest"))]
+pub(crate) fn lp_allocator_dealloc(ptr: * mut u8, layout: Layout) {
+    unsafe { GLOBAL_LP_ALLOCATOR.with_borrow(|a| a.dealloc(ptr, layout)) }
+}
+#[cfg(not(feature = "nottest"))]
+pub(crate) fn lp_allocator_get_begin_and_end() -> (usize, usize) {
+    GLOBAL_LP_ALLOCATOR.with_borrow(|a| (a.heap.as_ptr() as usize, a.heap.len() as usize))
 }
 
 unsafe impl<const SIZE : usize> GlobalAlloc for ImplLPAllocator<SIZE> {

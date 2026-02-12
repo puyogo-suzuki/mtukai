@@ -9,10 +9,11 @@ esp-lp-hal  = { version = "0.3.0", features = [], optional = true}
 esp-hal     = { version = "=1.0.0", features = ["unstable", "log-04"], optional = true }
 
 [dev-dependencies]
+esp-rs-copro-procmacro = { path = "../esp-rs-copro-procmacro", features=["has-lp-core"] }
 
 [features]
 default = []
 nottest = []
 is-lp-core = ["dep:esp-lp-hal", "nottest"]
 has-lp-core = ["dep:esp-println", "dep:esp-hal", "nottest"]
-esp32c6 = ["esp-lp-hal?/esp32c6", "esp-hal?/esp32c6"]
+esp32c6 = ["esp-lp-hal?/esp32c6", "esp-hal?/esp32c6", "esp-println?/esp32c6"]

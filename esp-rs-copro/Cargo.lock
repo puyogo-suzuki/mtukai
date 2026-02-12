@@ -508,6 +508,20 @@ dependencies = [
  "esp-hal",
  "esp-lp-hal",
  "esp-println",
+ "esp-rs-copro-procmacro",
+]
+
+[[package]]
+name = "esp-rs-copro-procmacro"
+version = "0.1.0"
+dependencies = [
+ "document-features",
+ "object",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "termcolor",
 ]
 
 [[package]]
