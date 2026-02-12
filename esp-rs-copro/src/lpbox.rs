@@ -6,8 +6,10 @@ use crate::lpalloc;
 use alloc::alloc;
 #[cfg(feature = "nottest")]
 use ::alloc::boxed::Box;
+#[cfg(feature = "nottest")]
+use core::cmp::Ordering;
 #[cfg(not(feature = "nottest"))]
-use std::{alloc, boxed::Box};
+use std::{alloc, boxed::Box, cmp::Ordering};
 
 pub struct LPBox<T: ?Sized + MovableObject>(pub(crate) NonNull<T>);
 
@@ -290,5 +292,46 @@ impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
         } else {
             // do not drop, as it is on the main coprocessor
         }
+    }
+}
+
+impl<T : ?Sized + MovableObject + PartialEq> PartialEq for LPBox<T> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        PartialEq::eq(&**self, &**other)
+    }
+    #[inline]
+    fn ne(&self, other: &Self) -> bool {
+        PartialEq::ne(&**self, &**other)
+    }
+}
+impl<T : ?Sized + MovableObject + Eq> Eq for LPBox<T> {}
+
+impl<T: ?Sized + MovableObject + PartialOrd> PartialOrd for LPBox<T> {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        PartialOrd::partial_cmp(&**self, &**other)
+    }
+    #[inline]
+    fn lt(&self, other: &Self) -> bool {
+        PartialOrd::lt(&**self, &**other)
+    }
+    #[inline]
+    fn le(&self, other: &Self) -> bool {
+        PartialOrd::le(&**self, &**other)
+    }
+    #[inline]
+    fn ge(&self, other: &Self) -> bool {
+        PartialOrd::ge(&**self, &**other)
+    }
+    #[inline]
+    fn gt(&self, other: &Self) -> bool {
+        PartialOrd::gt(&**self, &**other)
+    }
+}
+impl <T : ?Sized + MovableObject + Ord> Ord for LPBox<T> {
+    #[inline]
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        Ord::cmp(&**self, &**other)
     }
 }
