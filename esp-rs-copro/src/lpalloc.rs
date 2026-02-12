@@ -54,10 +54,29 @@ struct FreeBlock { next: * mut BlockHeader }
 unsafe extern "Rust" {
     #[link_name = "__lpcoproc_allocator_alloc"]
     pub(crate) fn lp_allocator_alloc(layout: Layout) -> * mut u8;
-
+    
     #[link_name = "__lpcoproc_allocator_dealloc"]
     pub(crate) fn lp_allocator_dealloc(ptr: * mut u8, layout: Layout);
 }
+
+#[cfg(feature = "esp32c6")]
+const LP_ADDRESS_MAX : usize = LP_ADDRESS_BASE + LP_ADDRESS_LEN;
+#[cfg(feature = "esp32c6")]
+const LP_ADDRESS_LEN : usize = 0x0004_0000;
+#[cfg(feature = "esp32c6")]
+const LP_ADDRESS_BASE : usize = 0x5000_0000;
+
+#[cfg(feature = "nottest")]
+pub(crate) fn get_lp_mem_begin_and_len() -> (usize, usize) {
+    (LP_ADDRESS_BASE, LP_ADDRESS_LEN)
+}
+
+
+pub fn in_lp_mem_range(addr : usize) -> bool {
+    let (base, len) = get_lp_mem_begin_and_len();
+    addr.wrapping_sub(base) < len
+}
+
 
 #[cfg(not(feature = "nottest"))]
 use std::cell::RefCell;
@@ -71,6 +90,7 @@ pub fn lp_allocator_init() {
     GLOBAL_LP_ALLOCATOR.with_borrow_mut(|a| a.init());
 }
 
+
 #[cfg(not(feature = "nottest"))]
 pub(crate) fn lp_allocator_alloc(layout: Layout) -> * mut u8 {
     unsafe { GLOBAL_LP_ALLOCATOR.with_borrow(|a| a.alloc(layout)) }
@@ -80,7 +100,7 @@ pub(crate) fn lp_allocator_dealloc(ptr: * mut u8, layout: Layout) {
     unsafe { GLOBAL_LP_ALLOCATOR.with_borrow(|a| a.dealloc(ptr, layout)) }
 }
 #[cfg(not(feature = "nottest"))]
-pub(crate) fn lp_allocator_get_begin_and_end() -> (usize, usize) {
+pub(crate) fn get_lp_mem_begin_and_len() -> (usize, usize) {
     GLOBAL_LP_ALLOCATOR.with_borrow(|a| (a.heap.as_ptr() as usize, a.heap.len() as usize))
 }
 

@@ -23,7 +23,6 @@ pub mod movableobjectwrapper;
 pub mod io;
 pub mod collections;
 pub mod prelude;
-mod constants;
 #[cfg(not(feature = "is-lp-core"))]
 mod addresstranslation;
 #[cfg(feature = "has-lp-core")]
