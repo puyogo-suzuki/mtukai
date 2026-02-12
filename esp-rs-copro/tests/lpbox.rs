@@ -13,6 +13,7 @@ fn test_lpbox_alloc() {
     let original = TestStruct { value1: 10, value2: 20 };
     let mut lpbox = LPBox::new(original);
     let lp_ptr = lpbox.get_moved_to_lp();
+    assert!(lpalloc::in_lp_mem_range(lp_ptr.as_ptr()));
 }
 
 #[test]
@@ -31,4 +32,15 @@ fn test_lpbox_transfer() {
     }
     assert_eq!(moved.value1, 30);
     assert_eq!(moved.value2, 40);
+}
+
+#[test]
+fn test_addresstranslation_identical() {
+    lpalloc::lp_allocator_init();
+    let original = TestStruct { value1: 10, value2: 20 };
+    let mut lpbox = LPBox::new(original);
+    let lp_ptr = lpbox.get_moved_to_lp();
+    let mut moved = lp_ptr.get_moved_to_main();
+    assert_eq!(lpbox.as_ptr(), moved.as_ptr());
+    let dont_drop = core::mem::ManuallyDrop::new(lpbox);
 }
