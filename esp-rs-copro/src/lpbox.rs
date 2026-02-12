@@ -51,10 +51,10 @@ pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
     }
 }
 
-#[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
+#[cfg(feature = "has-lp-core")]
 pub(crate) mod lpbox_static {
     use crate::addresstranslation::AddressTranslationTable;
-    use core::cell::{RefMut, Ref, RefCell, Cell};
+    use core::{alloc::Layout, cell::{Cell, Ref, RefCell, RefMut}};
 
     pub(crate) static ADDRESS_TRANSLATION_TABLE : SyncImplementedRefCell<AddressTranslationTable> =
         SyncImplementedRefCell::new(AddressTranslationTable::new());
@@ -97,6 +97,49 @@ pub(crate) mod lpbox_static {
     }
     pub fn remove_by_main(main: usize) -> Option<usize> {
         ADDRESS_TRANSLATION_TABLE.borrow_mut().remove_by_main(main)
+    }
+    pub fn remove_by_lp(lp: usize) -> Option<(usize, Layout)> {
+        ADDRESS_TRANSLATION_TABLE.borrow_mut().remove_by_lp(lp)
+    }
+    pub(crate) fn get_by_main(main: usize) -> Option<usize> {
+        ADDRESS_TRANSLATION_TABLE.borrow().get_by_main(main)
+    }
+    pub(crate) fn insert_no_drop<T : ?Sized>(main: *mut T, lp: usize) {
+        ADDRESS_TRANSLATION_TABLE.borrow_mut().insert_no_drop(main, lp);
+    }
+}
+
+#[cfg(not(feature = "nottest"))]
+pub(crate) mod lpbox_static {
+    use crate::addresstranslation::AddressTranslationTable;
+    use core::cell::{RefCell, Cell};
+    use std::alloc::Layout;
+
+    thread_local! {
+        pub(crate) static ADDRESS_TRANSLATION_TABLE : RefCell<AddressTranslationTable> =
+            RefCell::new(AddressTranslationTable::new());
+        static LPBOX_DROP_ENABLE : Cell<bool> = Cell::new(true);
+    }
+    
+    pub fn cleanup() {
+        LPBOX_DROP_ENABLE.set(false);
+        ADDRESS_TRANSLATION_TABLE.with_borrow_mut(|tbl| tbl.drop_and_clear());
+        LPBOX_DROP_ENABLE.set(true);
+    }
+    pub fn check_lpbox_drop_enable() -> bool {
+        LPBOX_DROP_ENABLE.get()
+    }
+    pub fn remove_by_main(main: usize) -> Option<usize> {
+        ADDRESS_TRANSLATION_TABLE.with_borrow_mut(|tbl| tbl.remove_by_main(main))
+    }
+    pub fn remove_by_lp(lp: usize) -> Option<(usize, Layout)> {
+        ADDRESS_TRANSLATION_TABLE.with_borrow_mut(|tbl| tbl.remove_by_lp(lp))
+    }
+    pub fn get_by_main(main: usize) -> Option<usize> {
+        ADDRESS_TRANSLATION_TABLE.with_borrow(|tbl| tbl.get_by_main(main))
+    }
+    pub(crate) fn insert_no_drop<T : ?Sized>(main: *mut T, lp: usize) {
+        ADDRESS_TRANSLATION_TABLE.with_borrow_mut(|tbl| tbl.insert_no_drop(main, lp));
     }
 }
 
@@ -167,23 +210,22 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub fn write_to_lp(value : &T) -> * mut u8 { unsafe {
         if let Some(existing_lp_addr) = 
-            lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow().get_by_main(value as *const T as * const () as usize) {
-            return *existing_lp_addr as * mut u8;
+            lpbox_static::get_by_main(value as *const T as * const () as usize) {
+            return existing_lp_addr as * mut u8;
         }
         let ptr = lpalloc::lp_allocator_alloc(core::alloc::Layout::for_value(value)) as * mut u8;
         value.move_to_lp(ptr);
         // ptr.copy_from(value, layout.size());
         // TODO: write_vtable
         // lpalloc::write_vtable(ptr as * mut u8, get_vtable(value) as * mut u8);
-        lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow_mut().insert_no_drop(value as *const T as *mut T, ptr as usize);
+        lpbox_static::insert_no_drop(value as *const T as *mut T, ptr as usize);
         ptr
     }}
 
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub fn write_to_main(value : &T) -> * mut u8 { unsafe {
         let addr =
-            lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow_mut()
-                .remove_by_lp(value as * const T as * const () as usize)
+            lpbox_static::remove_by_lp(value as * const T as * const () as usize)
                 .map_or_else(|| lpbox_alloc(core::alloc::Layout::for_value(value)) as usize,
                     |a| a.0);
         value.move_to_main(addr as * mut u8);

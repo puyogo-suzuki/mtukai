@@ -63,8 +63,8 @@ impl AddressTranslationTable {
         // self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::NonDroppable(main as *mut () as usize, unsafe{Layout::for_value_raw(main)}), copied: false });
     }
 
-    pub fn get_by_main(&self, main: usize) -> Option<&usize> {
-        self.main_to_lp.get(&main)
+    pub fn get_by_main(&self, main: usize) -> Option<usize> {
+        self.main_to_lp.get(&main).copied()
     }
 
     pub fn get_by_lp(&self, lp: usize) -> Option<&AddressTranslationEntry> {
