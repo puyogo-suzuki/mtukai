@@ -157,6 +157,13 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
         b.0.as_ptr()
     }
 
+    pub fn as_ptr(&self) -> * const T {
+        self.0.as_ptr() as * const T
+    }
+    pub fn as_mut_ptr(&mut self) -> * mut T {
+        self.0.as_ptr()
+    }
+
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub fn write_to_lp(value : &T) -> * mut u8 { unsafe {
         if let Some(existing_lp_addr) = 
