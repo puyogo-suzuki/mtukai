@@ -923,10 +923,10 @@ impl<T : MovableObject, const N: usize> LPVec<[T; N]> {
 }
 
 impl<T : MovableObject> MovableObject for LPVec<T> {
-    #[cfg(feature = "has-lp-core")]
-    unsafe fn move_to_main(&self, dest : *mut u8) {
+    #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
+    unsafe fn move_to_lp(&self, dest : *mut u8) {
         let dest = dest as * mut Self;
-        let dst_ptr = crate::lpbox::LPBox::<[T]>::write_to_main(self.as_slice());
+        let dst_ptr = crate::lpbox::LPBox::<[T]>::write_to_lp(self.as_slice());
         unsafe {
             dest.write_volatile(LPVec {
                 vec_inner : LPVecInner::from_raw_parts(dst_ptr as * mut u8, self.capacity()),
@@ -935,29 +935,27 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
             });
         }
     }
-    #[cfg(not(feature = "has-lp-core"))]
-    unsafe fn move_to_main(&self, _dest : *mut u8) {
-        unimplemented!()
-    }
 
-    #[cfg(feature = "has-lp-core")]
-    unsafe fn move_to_lp(&self, dest : *mut u8) {
+    #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
+    unsafe fn move_to_main(&self, dest : *mut u8) {
         let dest = dest as * mut Self;
         let dst_ptr = unsafe {
             let src = self.as_slice();
-            let (mut addr, lay) =
-                crate::lpbox::lpbox_static::ADDRESS_TRANSLATION_TABLE.borrow_mut()
-                    .remove_by_lp(src as * const [T] as * const () as usize)
-                    .map_or_else(|| {
-                            let lay = core::alloc::Layout::for_value(src);
-                            (crate::lpbox::lpbox_alloc(lay) as usize, lay)
-                        },
-                        |a| a);
-            // Check the layout is unmodified
-            if lay != core::alloc::Layout::for_value(src) {
-                // extend the main's.
-                addr = crate::lpbox::lpbox_realloc(addr as * mut u8, lay, core::alloc::Layout::for_value(src).size()) as usize;
-            }
+            let addr =
+                crate::lpbox::lpbox_static::remove_by_lp(src as * const [T] as * const () as usize)
+                .map_or_else(|| {
+                    let lay = core::alloc::Layout::for_value(src);
+                    crate::lpbox::lpbox_alloc(lay) as usize
+                },
+                |a| {
+                    // Check the layout is unmodified.
+                    if a.1 != core::alloc::Layout::for_value(src) {
+                        // extend the main's.
+                        crate::lpbox::lpbox_realloc(a.0 as * mut u8, a.1, core::alloc::Layout::for_value(src).size()) as usize
+                    } else {
+                        a.0
+                    }
+                });
             src.move_to_main(addr as * mut u8);
             addr as * mut u8
         };
@@ -969,7 +967,11 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
             });
         }
     }
-    #[cfg(not(feature = "has-lp-core"))]
+    #[cfg(feature = "is-lp-core")]
+    unsafe fn move_to_main(&self, _dest : *mut u8) {
+        unimplemented!()
+    }
+    #[cfg(feature = "is-lp-core")]
     unsafe fn move_to_lp(&self, _dest : *mut u8) {
         unimplemented!()
     }
