@@ -155,11 +155,7 @@ impl<T : MovableObject> LPVec<T> {
 
     #[inline]
     pub unsafe fn from_parts(ptr : NonNull<T>, len : usize, capacity : usize) -> Self {
-        LPVec {
-            vec_inner : unsafe { LPVecInner::from_raw_parts(ptr.as_ptr() as * mut u8, if T::IS_ZST {0} else {capacity}) },
-            len : len,
-            _marker : PhantomData
-        }
+        unsafe { Self::from_raw_parts(ptr.as_ptr(), len, capacity) }
     }
 
     #[must_use = "losing the pointer will leak memory"]
