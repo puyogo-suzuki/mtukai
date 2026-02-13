@@ -45,10 +45,12 @@ pub(crate) fn lpbox_realloc(ptr : * mut u8, old_layout : core::alloc::Layout, ne
 
 #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
 pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
-    if lpalloc::in_lp_mem_range(ptr) {
-        unsafe{lpalloc::lp_allocator_dealloc(ptr, layout);} // lp coprocessor
-    } else {
-        unsafe{alloc::dealloc(ptr, layout);} // main processor
+    unsafe {
+        if lpalloc::in_lp_mem_range(ptr) {
+            lpalloc::lp_allocator_dealloc(ptr, layout); // lp coprocessor
+        } else {
+            alloc::dealloc(ptr, layout); // main processor
+        }
     }
 }
 

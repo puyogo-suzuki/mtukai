@@ -71,13 +71,11 @@ pub(crate) fn get_lp_mem_begin_and_len() -> (usize, usize) {
     (LP_ADDRESS_BASE, LP_ADDRESS_LEN)
 }
 
-
 pub fn in_lp_mem_range<T>(addr : * const T) -> bool {
     let addr = addr as * const () as usize;
     let (base, len) = get_lp_mem_begin_and_len();
     addr.wrapping_sub(base) < len
 }
-
 
 #[cfg(not(feature = "nottest"))]
 use std::cell::RefCell;
