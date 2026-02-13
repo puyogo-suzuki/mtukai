@@ -560,6 +560,7 @@ impl<T : Copy> From<LPBox<[LPAdapter<T>]>> for LPVecCopy<T> {
         }
     }
 }
+
 impl<T : Copy> From<Box<[T]>> for LPVecCopy<T> {
     fn from(s: Box<[T]>) -> Self {
         unsafe {
@@ -569,6 +570,7 @@ impl<T : Copy> From<Box<[T]>> for LPVecCopy<T> {
         }
     }
 }
+
 impl<T : Copy> From<Box<[LPAdapter<T>]>> for LPVecCopy<T> {
     fn from(s: Box<[LPAdapter<T>]>) -> Self {
         unsafe {
@@ -578,11 +580,25 @@ impl<T : Copy> From<Box<[LPAdapter<T>]>> for LPVecCopy<T> {
         }
     }
 }
+
 impl<T : Copy> From<LPVecCopy<T>> for LPBox<[LPAdapter<T>]> {
     fn from(v: LPVecCopy<T>) -> Self {
         v.into_boxed_slice()
     }
 }
+
+impl<T : Copy> From<LPVec<LPAdapter<T>>> for LPVecCopy<T> {
+    fn from(s: LPVec<LPAdapter<T>>) -> LPVecCopy<T> {
+        LPVecCopy { vec_inner: s }
+    }
+}
+
+impl<T : Copy> Into<LPVec<LPAdapter<T>>> for LPVecCopy<T> {
+    fn into(self) -> LPVec<LPAdapter<T>> {
+        self.vec_inner
+    }
+}
+
 impl<T: Copy> Clone for LPVecCopy<T> {
     fn clone(&self) -> Self {
         Self::from(&**self)
