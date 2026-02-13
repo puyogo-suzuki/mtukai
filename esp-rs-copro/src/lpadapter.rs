@@ -1,11 +1,46 @@
-use core::{ops::{Deref, DerefMut}, ptr};
+use core::{ops::{Deref, DerefMut}, ptr, slice};
 
 use crate::movableobject::MovableObject;
 
 
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LPAdapter<T> where T : Copy {
     inner: T
+}
+
+impl<T: Copy> LPAdapter<T> {
+    pub fn new(inner: T) -> Self {
+        Self { inner }
+    }
+}
+
+pub trait LPAdapterSliceConvert<T : Copy> {
+    fn cast_lp_adapter(&self) -> &[LPAdapter<T>];
+    fn cast_mut_lp_adapter(&mut self) -> &mut [LPAdapter<T>];
+}
+
+impl<T : Copy> LPAdapterSliceConvert<T> for [T] {
+    fn cast_lp_adapter(&self) -> &[LPAdapter<T>] {
+        unsafe { slice::from_raw_parts(self.as_ptr() as *const LPAdapter<T>, self.len()) }
+    }
+    fn cast_mut_lp_adapter(&mut self) -> &mut [LPAdapter<T>] {
+        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr() as *mut LPAdapter<T>, self.len()) }
+    }
+}
+
+pub trait LPAdapterSliceConvertFrom<T : Copy> {
+    fn cast_lp_adapter(&self) -> &[T];
+    fn cast_mut_lp_adapter(&mut self) -> &mut [T];
+}
+
+impl<T : Copy> LPAdapterSliceConvertFrom<T> for [LPAdapter<T>] {
+    fn cast_lp_adapter(&self) -> &[T] {
+        unsafe { slice::from_raw_parts(self.as_ptr() as *const T, self.len()) }
+    }
+    fn cast_mut_lp_adapter(&mut self) -> &mut [T] {
+        unsafe { slice::from_raw_parts_mut(self.as_mut_ptr() as *mut T, self.len()) }
+    }
 }
 
 impl<T: Copy + PartialEq> PartialEq<T> for LPAdapter<T> {
