@@ -567,7 +567,7 @@ impl<T : MovableObject> LPVec<T> {
     }
 
     #[inline]
-    unsafe fn append_elements(&mut self, other: *const [T]) {
+    pub(crate) unsafe fn append_elements(&mut self, other: *const [T]) {
         let count = other.len();
         self.try_reserve(count).unwrap();
         let len = self.len();
@@ -820,7 +820,7 @@ impl<T: Clone + MovableObject> LPVec<T> {
     }
 }
 
-trait ExtendFromWithinSpec {
+pub(crate) trait ExtendFromWithinSpec {
     unsafe fn spec_extend_from_within(&mut self, src: Range<usize>);
 }
 
