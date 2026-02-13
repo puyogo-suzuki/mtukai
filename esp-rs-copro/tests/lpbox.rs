@@ -1,4 +1,7 @@
+use esp_rs_copro::lpalloc::in_lp_mem_range;
 use esp_rs_copro::{lpbox::LPBox, lpalloc};
+use rand::{Rng, SeedableRng};
+use rand::rngs::StdRng;
 
 #[derive(esp_rs_copro_procmacro::MovableObject)]
 struct TestStruct {
@@ -20,13 +23,13 @@ fn test_lpbox_alloc() {
 fn test_lpbox_transfer() {
     lpalloc::lp_allocator_init();
     let original = TestStruct { value1: 10, value2: 20 };
-    let mut lpbox = LPBox::new(original);
+    let lpbox = LPBox::new(original);
     let mut lp_ptr = lpbox.get_moved_to_lp();
     lp_ptr.value1 = 30;
     lp_ptr.value2 = 40;
     assert_eq!(lpbox.value1, 10);
     assert_eq!(lpbox.value2, 20);
-    let mut moved = lp_ptr.get_moved_to_main();
+    let moved = lp_ptr.get_moved_to_main();
     if lpbox.as_ptr() == moved.as_ptr() {
         let dont_drop = core::mem::ManuallyDrop::new(lpbox);
     }
@@ -43,4 +46,107 @@ fn test_addresstranslation_identical() {
     let mut moved = lp_ptr.get_moved_to_main();
     assert_eq!(lpbox.as_ptr(), moved.as_ptr());
     let dont_drop = core::mem::ManuallyDrop::new(lpbox);
+}
+
+#[test]
+fn test_from_box() {
+    let boxed = Box::new(TestStruct { value1: 50, value2: 60 });
+    let lpboxed = LPBox::from_box(boxed);
+    assert_eq!(lpboxed.value1, 50);
+}
+
+#[derive(esp_rs_copro_procmacro::MovableObject, PartialEq, Eq, Debug)]
+struct TestLinkedList {
+    next: Option<LPBox<TestLinkedList>>,
+    val: i32
+}
+
+impl TestLinkedList {
+    fn new(val: i32, next: Option<LPBox<TestLinkedList>>) -> Self {
+        TestLinkedList { val, next }
+    }
+    fn copy(&self) -> Self {
+        TestLinkedList {
+            val: self.val,
+            next: self.next.as_ref().map(|n| LPBox::new(n.copy()))
+        }
+    }
+}
+
+fn gen_random_linked_list(depth: u32, rng: &mut StdRng) -> TestLinkedList {
+    let mut list = TestLinkedList::new(rng.next_u32() as i32, None);
+    for _ in 0..depth {
+        list = TestLinkedList::new(rng.next_u32() as i32, Some(LPBox::new(list)));
+    }
+    list
+}
+
+static RAND_SEED: [u8; 32] = [5u8; 32];
+
+#[test]
+fn test_linked_list_same_value() {
+    lpalloc::lp_allocator_init();
+    let mut rng = StdRng::from_seed(RAND_SEED);
+    let mut lpbox = LPBox::new(gen_random_linked_list(5, &mut rng));
+    let mut lp_ptr = lpbox.get_moved_to_lp();
+    assert_eq!(*lpbox, *lp_ptr);
+    let mut moved = lp_ptr.get_moved_to_main();
+    if lpbox.as_ptr() == moved.as_ptr() {
+        let dont_drop = core::mem::ManuallyDrop::new(lpbox);
+    }
+    assert_eq!(*moved, *lp_ptr);
+}
+
+
+#[test]
+fn test_linked_list_correctly_moved() {
+    fn check_is_in_lp_mem_range(is_in : bool, node : &LPBox<TestLinkedList>) {
+        let mut cur = node;
+        loop {
+            assert!(in_lp_mem_range(cur.as_ptr()) == is_in);
+            if let Some(cur_new) = &cur.next {
+                cur = cur_new;
+            } else {
+                break;
+            }
+        }
+    }
+
+    lpalloc::lp_allocator_init();
+    let mut rng = StdRng::from_seed(RAND_SEED);
+    let lpbox = LPBox::new(gen_random_linked_list(5, &mut rng));
+    let lp_ptr = lpbox.get_moved_to_lp();
+    check_is_in_lp_mem_range(true, &lp_ptr);
+    let moved = lp_ptr.get_moved_to_main();
+    check_is_in_lp_mem_range(false, &moved);
+    if lpbox.as_ptr() == moved.as_ptr() {
+        let dont_drop = core::mem::ManuallyDrop::new(lpbox);
+    }
+}
+
+#[test]
+fn test_linked_list_correctly_modified() {
+    fn twice(node: &mut LPBox<TestLinkedList>) {
+        let mut cur = node;
+        loop {
+            cur.val = cur.val.wrapping_mul(2);
+            if let Some(next) = cur.next.as_mut() {
+                cur = next;
+            } else {
+                break;
+            }
+        }
+    }
+    lpalloc::lp_allocator_init();
+    let mut rng = StdRng::from_seed(RAND_SEED);
+    let original = gen_random_linked_list(5, &mut rng);
+    let mut lpbox = LPBox::new(original.copy());
+    let mut lp_ptr = lpbox.get_moved_to_lp();
+    twice(&mut lp_ptr);
+    let mut moved = lp_ptr.get_moved_to_main();
+    if lpbox.as_ptr() == moved.as_ptr() {
+        let dont_drop = core::mem::ManuallyDrop::new(lpbox);
+    }
+    assert_eq!(*lp_ptr, *moved);
+    assert_ne!(*moved, original);
 }
