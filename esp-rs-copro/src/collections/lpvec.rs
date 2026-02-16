@@ -100,10 +100,7 @@ impl LPVecInner {
     fn deallocate(&mut self, elem_layout : Layout) {
         let layout = unsafe { self.current_memory(elem_layout) };
         if layout.size() == 0 { return; }
-        #[cfg(feature = "has-lp-core")]
         crate::lpbox::lp_dealloc(self.ptr.as_ptr(), layout);
-        #[cfg(any(feature = "is-lp-core", not(feature = "nottest")))]
-        unsafe { alloc::dealloc(self.ptr.as_ptr(), layout); }
     }
 
     const unsafe fn from_raw_parts(ptr : * mut u8, capacity : usize) -> Self {

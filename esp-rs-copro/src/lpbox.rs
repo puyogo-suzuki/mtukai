@@ -53,6 +53,10 @@ pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
         }
     }
 }
+#[cfg(feature = "is-lp-core")]
+pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
+    unsafe{ alloc::dealloc(ptr, layout); } // main processor
+}
 
 #[cfg(feature = "has-lp-core")]
 pub(crate) mod lpbox_static {
@@ -248,8 +252,8 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     pub fn get_moved_to_lp(&self) -> LPBox<T>{ todo!(); }
     #[cfg(feature = "is-lp-core")]
     pub fn get_moved_to_main(&self) -> LPBox<T> { todo!(); }
+    
 }
-
 
 impl<T: ?Sized + MovableObject> MovableObject for LPBox<T> {
     unsafe fn move_to_main(&self, dest: *mut u8) {
