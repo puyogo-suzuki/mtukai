@@ -18,7 +18,7 @@ struct TestStruct {
 fn test_lpbox_alloc() {
     lpalloc::lp_allocator_init();
     let original = TestStruct { value1: 10, value2: 20 };
-    let mut lpbox = LPBox::new(original);
+    let lpbox = LPBox::new(original);
     let lp_ptr = lpbox.get_moved_to_lp();
     assert!(lpalloc::in_lp_mem_range(lp_ptr.as_ptr()));
 }
@@ -35,7 +35,7 @@ fn test_lpbox_transfer() {
     assert_eq!(lpbox.value2, 20);
     let moved = lp_ptr.get_moved_to_main();
     if lpbox.as_ptr() == moved.as_ptr() {
-        let dont_drop = core::mem::ManuallyDrop::new(lpbox);
+        let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
     }
     assert_eq!(moved.value1, 30);
     assert_eq!(moved.value2, 40);
@@ -49,7 +49,7 @@ fn test_addresstranslation_identical() {
     let lp_ptr = lpbox.get_moved_to_lp();
     let moved = lp_ptr.get_moved_to_main();
     assert_eq!(lpbox.as_ptr(), moved.as_ptr());
-    let dont_drop = core::mem::ManuallyDrop::new(lpbox);
+    let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
 }
 
 #[test]
@@ -91,12 +91,12 @@ static RAND_SEED: [u8; 32] = [5u8; 32];
 fn test_linked_list_same_value() {
     lpalloc::lp_allocator_init();
     let mut rng = StdRng::from_seed(RAND_SEED);
-    let mut lpbox = LPBox::new(gen_random_linked_list(5, &mut rng));
-    let mut lp_ptr = lpbox.get_moved_to_lp();
+    let lpbox = LPBox::new(gen_random_linked_list(5, &mut rng));
+    let lp_ptr = lpbox.get_moved_to_lp();
     assert_eq!(*lpbox, *lp_ptr);
-    let mut moved = lp_ptr.get_moved_to_main();
+    let moved = lp_ptr.get_moved_to_main();
     if lpbox.as_ptr() == moved.as_ptr() {
-        let dont_drop = core::mem::ManuallyDrop::new(lpbox);
+        let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
     }
     assert_eq!(*moved, *lp_ptr);
 }
@@ -124,7 +124,7 @@ fn test_linked_list_correctly_moved() {
     let moved = lp_ptr.get_moved_to_main();
     check_is_in_lp_mem_range(false, &moved);
     if lpbox.as_ptr() == moved.as_ptr() {
-        let dont_drop = core::mem::ManuallyDrop::new(lpbox);
+        let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
     }
 }
 
@@ -144,12 +144,12 @@ fn test_linked_list_correctly_modified() {
     lpalloc::lp_allocator_init();
     let mut rng = StdRng::from_seed(RAND_SEED);
     let original = gen_random_linked_list(5, &mut rng);
-    let mut lpbox = LPBox::new(original.copy());
+    let lpbox = LPBox::new(original.copy());
     let mut lp_ptr = lpbox.get_moved_to_lp();
     twice(&mut lp_ptr);
-    let mut moved = lp_ptr.get_moved_to_main();
+    let moved = lp_ptr.get_moved_to_main();
     if lpbox.as_ptr() == moved.as_ptr() {
-        let dont_drop = core::mem::ManuallyDrop::new(lpbox);
+        let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
     }
     assert_eq!(*lp_ptr, *moved);
     assert_ne!(*moved, original);
@@ -168,7 +168,7 @@ fn test_lpvec_alloc() {
     let moved_back = moved.get_moved_to_main();
     assert!(!in_lp_mem_range((*moved_back).as_ptr()));
     if v.as_ptr() == moved_back.as_ptr() {
-        let dont_drop = core::mem::ManuallyDrop::new(v);
+        let _dont_drop = core::mem::ManuallyDrop::new(v);
     }
 }
 
@@ -184,7 +184,7 @@ fn test_lpvec_correctly_moved() {
     let moved_back = moved.get_moved_to_main();
     assert_eq!(moved, moved_back);
     if v.as_ptr() == moved_back.as_ptr() {
-        let dont_drop = core::mem::ManuallyDrop::new(v);
+        let _dont_drop = core::mem::ManuallyDrop::new(v);
     }
 }
 
@@ -200,7 +200,7 @@ fn test_lpvec_correctly_modified() {
     let moved_back = moved.get_moved_to_main();
     assert_eq!(moved_back[1], 50);
     if v.as_ptr() == moved_back.as_ptr() {
-        let dont_drop = core::mem::ManuallyDrop::new(v);
+        let _dont_drop = core::mem::ManuallyDrop::new(v);
     }
 }
 
