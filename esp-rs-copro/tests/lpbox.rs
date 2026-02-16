@@ -1,14 +1,18 @@
+use esp_rs_copro::collections::lpveccopy::LPVecCopy;
 use esp_rs_copro::lpalloc::in_lp_mem_range;
 use esp_rs_copro::{lpbox::LPBox, lpalloc};
 use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+
+/// This is just tests for LPBox.
+/// The common way is too far from these code.
+/// Please refer to the examples for the common way to use LPBox.
 
 #[derive(esp_rs_copro_procmacro::MovableObject)]
 struct TestStruct {
     value1: i32,
     value2: i32
 }
-
 
 #[test]
 fn test_lpbox_alloc() {
@@ -41,9 +45,9 @@ fn test_lpbox_transfer() {
 fn test_addresstranslation_identical() {
     lpalloc::lp_allocator_init();
     let original = TestStruct { value1: 10, value2: 20 };
-    let mut lpbox = LPBox::new(original);
+    let lpbox = LPBox::new(original);
     let lp_ptr = lpbox.get_moved_to_lp();
-    let mut moved = lp_ptr.get_moved_to_main();
+    let moved = lp_ptr.get_moved_to_main();
     assert_eq!(lpbox.as_ptr(), moved.as_ptr());
     let dont_drop = core::mem::ManuallyDrop::new(lpbox);
 }
@@ -150,3 +154,54 @@ fn test_linked_list_correctly_modified() {
     assert_eq!(*lp_ptr, *moved);
     assert_ne!(*moved, original);
 }
+
+#[test]
+fn test_lpvec_alloc() {
+    lpalloc::lp_allocator_init();
+    let mut v = LPBox::new(LPVecCopy::new());
+    v.push(10);
+    v.push(40);
+    v.push(20);
+    assert!(!in_lp_mem_range((*v).as_ptr()));
+    let moved = v.get_moved_to_lp();
+    assert!(in_lp_mem_range((*moved).as_ptr()));
+    let moved_back = moved.get_moved_to_main();
+    assert!(!in_lp_mem_range((*moved_back).as_ptr()));
+    if v.as_ptr() == moved_back.as_ptr() {
+        let dont_drop = core::mem::ManuallyDrop::new(v);
+    }
+}
+
+#[test]
+fn test_lpvec_correctly_moved() {
+    lpalloc::lp_allocator_init();
+    let mut v = LPBox::new(LPVecCopy::new());
+    v.push(10);
+    v.push(40);
+    v.push(20);
+    let moved = v.get_moved_to_lp();
+    assert_eq!(v, moved);
+    let moved_back = moved.get_moved_to_main();
+    assert_eq!(moved, moved_back);
+    if v.as_ptr() == moved_back.as_ptr() {
+        let dont_drop = core::mem::ManuallyDrop::new(v);
+    }
+}
+
+#[test]
+fn test_lpvec_correctly_modified() {
+    lpalloc::lp_allocator_init();
+    let mut v = LPBox::new(LPVecCopy::new());
+    v.push(10);
+    v.push(20);
+    v.push(30);
+    let mut moved = v.get_moved_to_lp();
+    moved[1] = 50;
+    let moved_back = moved.get_moved_to_main();
+    assert_eq!(moved_back[1], 50);
+    if v.as_ptr() == moved_back.as_ptr() {
+        let dont_drop = core::mem::ManuallyDrop::new(v);
+    }
+}
+
+// TODO: check the exapansion of LPVec in the LP memory. It is hard to check the expansion with a current custom allocator.
