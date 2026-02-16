@@ -192,6 +192,15 @@ impl<T: MovableObject> LPBox<T> {
         lpalloc::write_vtable(ptr as * mut u8, get_vtable(ptr.as_ref().unwrap()) as * mut u8);
         LPBox(NonNull::new_unchecked(ptr))
     }}
+
+    #[cfg(not(feature = "nottest"))]
+    pub unsafe fn new_lp(value: T) -> Self {
+        unsafe {
+            let ptr = lpalloc::lp_allocator_alloc(core::alloc::Layout::for_value(&value)) as * mut T;
+            ptr.write_volatile(value);
+            LPBox(NonNull::new_unchecked(ptr as * mut T))
+        }
+    }
 }
 
 impl<T: ?Sized + MovableObject> LPBox<T> {
