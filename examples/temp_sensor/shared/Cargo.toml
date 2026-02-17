@@ -1,0 +1,8 @@
+[package]
+name = "shared"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+esp-rs-copro = { path = "../../../esp-rs-copro"}
+esp-rs-copro-procmacro = { path = "../../../esp-rs-copro-procmacro" }

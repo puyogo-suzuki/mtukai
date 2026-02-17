@@ -10,8 +10,8 @@ embedded-hal      = { version = "1.0.0" }
 cfg-if = "1.0.3"
 panic-halt = "0.2.0"
 
-esp-rs-copro = { path = "../esp-rs-copro", features=["is-lp-core", "esp32c6"] }
-esp-rs-copro-procmacro = { path = "../esp-rs-copro-procmacro", features=["is-lp-core"] }
+esp-rs-copro = { path = "../../../esp-rs-copro", features=["is-lp-core", "esp32c6"] }
+esp-rs-copro-procmacro = { path = "../../../esp-rs-copro-procmacro", features=["is-lp-core"] }
 
 shared = { path = "../shared" }
 [profile.dev]
