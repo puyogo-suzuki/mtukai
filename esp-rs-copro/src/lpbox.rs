@@ -265,12 +265,22 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
 }
 
 impl<T: ?Sized + MovableObject> MovableObject for LPBox<T> {
+    #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_main(&self, dest: *mut u8) {
         unsafe { (dest as *mut LPBox<T>).write_volatile(self.get_moved_to_main()); }
     }
+    #[cfg(feature = "is-lp-core")]
+    unsafe fn move_to_main(&self, dest: *mut u8) {
+        unimplemented!("Moving to main from LPBox is not supported on the LP coprocessor");
+    }
 
+    #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_lp(&self, dest: *mut u8) {
         unsafe { (dest as *mut LPBox<T>).write_volatile(self.get_moved_to_lp()); }
+    }
+    #[cfg(feature = "is-lp-core")]
+    unsafe fn move_to_lp(&self, dest: *mut u8) {
+        unimplemented!("Moving to LP from LPBox is not supported on the LP coprocessor");
     }
 }
 
