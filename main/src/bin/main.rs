@@ -17,7 +17,7 @@ use esp_hal::delay::Delay;
 
 use esp_rs_copro::io::i2c::LPI2C;
 use esp_rs_copro::lpbox::{LPBox, new_array_uninitialized};
-use shared::{MainLPParcel, TestList};
+use shared::MainLPParcel;
 
 use esp_hal::{
     gpio::lp_io::LowPowerOutput,
@@ -38,51 +38,6 @@ fn panic(_: &core::panic::PanicInfo) -> ! {
 esp_bootloader_esp_idf::esp_app_desc!();
 
 define_lp_allocator!();
-
-fn test_listcreate() -> TestList {
-    TestList {
-        next: Some(LPBox::new(TestList {
-            next: Some(LPBox::new(TestList {
-                next: None,
-                value: 7
-            })),
-            value: 21
-        })),
-        value: 42
-    }
-}
-
-fn test_listprint(tl : &TestList) {
-    let mut current = Some(tl);
-    println!("Printing TestList.");
-    while let Some(node) = current {
-        println!("Addr: {:p} Value: {}", node as *const _ as *const (), node.value);
-        current = node.next.as_deref();
-    }
-
-}
-
-fn testlist_main() -> !{
-    // configure GPIO 1 as LP output pin
-    let peripherals: esp_hal::peripherals::Peripherals = esp_hal::init(esp_hal::Config::default());
-    let lp_pin = LowPowerOutput::new(peripherals.GPIO5);
-
-    let mut lp_core = LpCore::new(peripherals.LP_CORE);
-    lp_core.stop();
-    println!("lp core stopped");
-    // load code to LP core
-    let lp_core_code = load_lp_code2!(
-        "../lp/target/riscv32imac-unknown-none-elf/release/esp-rs-copro-lp"
-    );
-    {
-        let mut test_list = test_listcreate();
-        test_listprint(&test_list);
-        println!("lpcore run!");
-        lp_core_code.run_light_sleep(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut Rtc::new(peripherals.LPWR), &mut test_list, lp_pin);
-        test_listprint(&test_list);
-    }
-    loop {}
-}
 
 fn sht30_main() -> !{
     let peripherals = esp_hal::init(esp_hal::Config::default());
@@ -153,8 +108,6 @@ fn main() -> ! {
     esp_println::logger::init_logger_from_env();
     // let delay = Delay::new();
     sht30_main();
-    // sht30_main_main();
     // refresh_gpio();
     // start LP core
-    // for inspiration have a look at the examples at https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.0.0-rc.0/examples/src/bin
 }

@@ -26,9 +26,3 @@ pub struct MainLPParcel{
     pub i2c : LPI2C,
     pub result : LPBox<[TempAndHumid]>,
 }
-
-#[derive(esp_rs_copro_procmacro::MovableObject)]
-pub struct TestList {
-    pub next : Option<LPBox<TestList>>,
-    pub value : i32
-}

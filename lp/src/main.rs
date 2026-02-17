@@ -5,7 +5,7 @@
 use embedded_hal::{delay::DelayNs, digital::OutputPin};
 use esp_lp_hal::{delay::Delay, gpio::Output, prelude::*, wake_hp_core};
 use esp_rs_copro::{io::i2c::{LPI2C, LPI2CError}, prelude::lp_core_halt};
-use shared::{MainLPParcel, TempAndHumid, TestList};
+use shared::{MainLPParcel, TempAndHumid};
 use panic_halt as _;
 
 esp_rs_copro_procmacro::esp_rs_copro_statics!(4096);
@@ -21,30 +21,6 @@ fn ignore_alloc_error(_: core::alloc::Layout) -> ! {
 //         const ADDRESS: u32 = 0x400;
 //     }
 // }
-
-fn sum_testlist(testlist : &TestList) -> i32 {
-    let mut sum = 0;
-    let mut current = Some(testlist);
-    while let Some(node) = current {
-        sum += node.value;
-        current = node.next.as_deref();
-    }
-    sum
-}
-
-fn double_testlist(testlist : &mut TestList) {
-    let mut current = Some(testlist);
-    while let Some(node) = current {
-        node.value *= 2;
-        current = node.next.as_deref_mut();
-    }
-}
-
-fn testlist_main() {
-    let v = get_transfer::<TestList>().unwrap();
-    let val = sum_testlist(&v);
-    double_testlist(v);
-}
 
 fn read_sht30(me : &mut LPI2C) -> Result<TempAndHumid, LPI2CError> {
     let addr = 0x44;
@@ -73,13 +49,6 @@ fn sht30_main() -> !{
 }
 
 #[entry]
-fn main(mut gpio1: Output<5>) -> ! {
+fn main(mut gpio5: Output<5>) -> ! {
     sht30_main();
-    loop {
-        gpio1.set_high().unwrap();
-        Delay.delay_ms(500);
-
-        gpio1.set_low().unwrap();
-        Delay.delay_ms(500);
-    }
 }
