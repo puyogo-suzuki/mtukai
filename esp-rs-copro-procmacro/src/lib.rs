@@ -81,7 +81,7 @@ pub fn define_lp_allocator(_input: TokenStream) -> TokenStream {
 pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     use std::{fs, path::Path};
 
-    use object::{File, Object, ObjectSection, ObjectSymbol, Section, SectionKind, SectionFlags};
+    use object::{File, Object, ObjectSection, ObjectSymbol, Section, SectionFlags};
     use parse::Error;
     use proc_macro::Span;
     use proc_macro_crate::{FoundCrate, crate_name};
