@@ -1,7 +1,7 @@
 #![no_std]
 
 use core::option::Option;
-use esp_rs_copro::{lpbox::LPBox, io::i2c::LPI2C};
+use esp_rs_copro::{io::i2c::LPI2C, collections::lpvec::LPVec};
 
 #[derive(Clone, Copy, esp_rs_copro_procmacro::MovableObject)]
 pub struct TempAndHumid {
@@ -24,5 +24,6 @@ impl TempAndHumid {
 #[derive(esp_rs_copro_procmacro::MovableObject)]
 pub struct MainLPParcel{
     pub i2c : LPI2C,
-    pub result : LPBox<[TempAndHumid]>,
+    pub measurement_count : usize,
+    pub result : LPVec<Option<TempAndHumid>>
 }

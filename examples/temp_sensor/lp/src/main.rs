@@ -7,6 +7,7 @@ use esp_lp_hal::{delay::Delay, gpio::Output, prelude::*, wake_hp_core};
 use esp_rs_copro::{io::i2c::{LPI2C, LPI2CError}, prelude::lp_core_halt};
 use shared::{MainLPParcel, TempAndHumid};
 use panic_halt as _;
+use core::mem::MaybeUninit;
 
 esp_rs_copro_procmacro::esp_rs_copro_statics!(4096);
 #[alloc_error_handler]
@@ -39,9 +40,8 @@ fn read_sht30(me : &mut LPI2C) -> Result<TempAndHumid, LPI2CError> {
 
 fn sht30_main() -> !{
     let v: &mut MainLPParcel = get_transfer::<MainLPParcel>().unwrap();
-    for r in v.result.iter_mut() {
-        *r = read_sht30(&mut v.i2c).unwrap_or(TempAndHumid::zero());
-        // (v.temperatures[i], v.humidities[i]) = (-999, -999);
+    for i in 0..v.measurement_count {
+        v.result.push(read_sht30(&mut v.i2c).ok());
         Delay.delay_ms(1000);
     }
     wake_hp_core();

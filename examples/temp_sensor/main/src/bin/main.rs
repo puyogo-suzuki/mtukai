@@ -15,8 +15,7 @@ use esp_hal::rtc_cntl::Rtc;
 use esp_hal::time::Rate;
 use esp_hal::delay::Delay;
 
-use esp_rs_copro::io::i2c::LPI2C;
-use esp_rs_copro::lpbox::{LPBox, new_array_uninitialized};
+use esp_rs_copro::{io::i2c::LPI2C, collections::lpvec::LPVec};
 use shared::MainLPParcel;
 
 use esp_hal::{
@@ -71,12 +70,20 @@ fn sht30_main() -> !{
 
         let mut parcel = MainLPParcel {
             i2c : LPI2C::new(i2c),
-            result : new_array_uninitialized(10)
+            result : LPVec::new(),
+            measurement_count : 5
         };
         println!("lpcore run");
         lp_core_code.run_light_sleep(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut Rtc::new(peripherals.LPWR), &mut parcel, lp_pin);
         for i in parcel.result.iter() {
-            println!("Temp: {} C, Hum: {} %", i.temperature, i.humidity);
+            match i {
+                Some(i) => {
+                    println!("Temp: {} C, Hum: {} %", i.temperature, i.humidity);
+                },
+                None => {
+                    println!("Failed to read from sensor");
+                }
+            }
         }
     }
     loop {}
