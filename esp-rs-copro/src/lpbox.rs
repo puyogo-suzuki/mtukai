@@ -159,13 +159,6 @@ pub(crate) fn remove_by_main(main: usize) -> Option<usize> {
     lpbox_static::remove_by_main(main)
 }
 
-pub fn new_array_uninitialized<T : MovableObject>(n : isize) ->  LPBox<[T]> {
-    unsafe {
-        let b : Box<[MaybeUninit<T>]> = Box::new_uninit_slice(n as usize);
-        LPBox(NonNull::new_unchecked(Box::into_raw(b) as * mut [T]))
-    }
-} 
-
 impl<T: MovableObject, const N : usize> LPBox<[T;N]> {
     pub fn into_dynamic_slice(self) -> LPBox<[T]> {
         let original = mem::ManuallyDrop::new(self);
@@ -200,6 +193,12 @@ impl<T: MovableObject> LPBox<T> {
             ptr.write_volatile(value);
             LPBox(NonNull::new_unchecked(ptr as * mut T))
         }
+    }
+}
+
+impl<T: MovableObject + Copy> LPBox<T> {
+    pub fn new_uninit_slice(n : usize) -> LPBox<[MaybeUninit<T>]> {
+        LPBox::from_box(Box::new_uninit_slice(n))
     }
 }
 

@@ -1,3 +1,5 @@
+use core::{intrinsics::copy_nonoverlapping, mem::MaybeUninit};
+
 pub trait MovableObject {
     unsafe fn move_to_main(&self, dest : *mut u8);
     unsafe fn move_to_lp(&self, dest : *mut u8);
@@ -61,4 +63,20 @@ impl<T : MovableObject> MovableObject for Option<T> {
             None => { None }
         });
     }}
+}
+
+impl MovableObject for () {
+    unsafe fn move_to_main(&self, dest: *mut u8) {}
+    unsafe fn move_to_lp(&self, dest: *mut u8) {}
+}
+
+// We only support MaybeUninit of Copy types, because otherwise we would need to move the value out of the MaybeUninit in order to move it, which would prevent us from leaving the original MaybeUninit uninitialized in the case where the value is not actually initialized.
+impl<T : MovableObject + Copy> MovableObject for MaybeUninit<T> {
+    unsafe fn move_to_main(&self, dest: *mut u8) {
+        unsafe { copy_nonoverlapping(self as * const Self, dest as * mut Self, 1); }
+    }
+
+    unsafe fn move_to_lp(&self, dest: *mut u8) {
+        unsafe { copy_nonoverlapping(self as * const Self, dest as * mut Self, 1); }
+    }
 }
