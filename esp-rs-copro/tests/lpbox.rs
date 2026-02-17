@@ -19,7 +19,7 @@ fn test_lpbox_alloc() {
     lpalloc::lp_allocator_init();
     let original = TestStruct { value1: 10, value2: 20 };
     let lpbox = LPBox::new(original);
-    let lp_ptr = lpbox.get_moved_to_lp();
+    let lp_ptr = unsafe{ lpbox.get_moved_to_lp() };
     assert!(lpalloc::in_lp_mem_range(lp_ptr.as_ptr()));
 }
 
@@ -28,12 +28,12 @@ fn test_lpbox_transfer() {
     lpalloc::lp_allocator_init();
     let original = TestStruct { value1: 10, value2: 20 };
     let lpbox = LPBox::new(original);
-    let mut lp_ptr = lpbox.get_moved_to_lp();
+    let mut lp_ptr = unsafe{ lpbox.get_moved_to_lp() };
     lp_ptr.value1 = 30;
     lp_ptr.value2 = 40;
     assert_eq!(lpbox.value1, 10);
     assert_eq!(lpbox.value2, 20);
-    let moved = lp_ptr.get_moved_to_main();
+    let moved = unsafe{ lp_ptr.get_moved_to_main() };
     if lpbox.as_ptr() == moved.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
     }
@@ -46,8 +46,8 @@ fn test_addresstranslation_identical() {
     lpalloc::lp_allocator_init();
     let original = TestStruct { value1: 10, value2: 20 };
     let lpbox = LPBox::new(original);
-    let lp_ptr = lpbox.get_moved_to_lp();
-    let moved = lp_ptr.get_moved_to_main();
+    let lp_ptr = unsafe{ lpbox.get_moved_to_lp() };
+    let moved = unsafe{ lp_ptr.get_moved_to_main() };
     assert_eq!(lpbox.as_ptr(), moved.as_ptr());
     let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
 }
@@ -92,9 +92,9 @@ fn test_linked_list_same_value() {
     lpalloc::lp_allocator_init();
     let mut rng = StdRng::from_seed(RAND_SEED);
     let lpbox = LPBox::new(gen_random_linked_list(5, &mut rng));
-    let lp_ptr = lpbox.get_moved_to_lp();
+    let lp_ptr = unsafe{ lpbox.get_moved_to_lp() };
     assert_eq!(*lpbox, *lp_ptr);
-    let moved = lp_ptr.get_moved_to_main();
+    let moved = unsafe{ lp_ptr.get_moved_to_main() };
     if lpbox.as_ptr() == moved.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
     }
@@ -119,9 +119,9 @@ fn test_linked_list_correctly_moved() {
     lpalloc::lp_allocator_init();
     let mut rng = StdRng::from_seed(RAND_SEED);
     let lpbox = LPBox::new(gen_random_linked_list(5, &mut rng));
-    let lp_ptr = lpbox.get_moved_to_lp();
+    let lp_ptr = unsafe{ lpbox.get_moved_to_lp() };
     check_is_in_lp_mem_range(true, &lp_ptr);
-    let moved = lp_ptr.get_moved_to_main();
+    let moved = unsafe{ lp_ptr.get_moved_to_main() };
     check_is_in_lp_mem_range(false, &moved);
     if lpbox.as_ptr() == moved.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
@@ -145,9 +145,9 @@ fn test_linked_list_correctly_modified() {
     let mut rng = StdRng::from_seed(RAND_SEED);
     let original = gen_random_linked_list(5, &mut rng);
     let lpbox = LPBox::new(original.copy());
-    let mut lp_ptr = lpbox.get_moved_to_lp();
+    let mut lp_ptr = unsafe{ lpbox.get_moved_to_lp() };
     twice(&mut lp_ptr);
-    let moved = lp_ptr.get_moved_to_main();
+    let moved = unsafe{ lp_ptr.get_moved_to_main() };
     if lpbox.as_ptr() == moved.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
     }
@@ -163,9 +163,9 @@ fn test_lpvec_alloc() {
     v.push(40);
     v.push(20);
     assert!(!in_lp_mem_range((*v).as_ptr()));
-    let moved = v.get_moved_to_lp();
+    let moved = unsafe{ v.get_moved_to_lp() };
     assert!(in_lp_mem_range((*moved).as_ptr()));
-    let moved_back = moved.get_moved_to_main();
+    let moved_back = unsafe{ moved.get_moved_to_main() };
     assert!(!in_lp_mem_range((*moved_back).as_ptr()));
     if v.as_ptr() == moved_back.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(v);
@@ -179,9 +179,9 @@ fn test_lpvec_correctly_moved() {
     v.push(10);
     v.push(40);
     v.push(20);
-    let moved = v.get_moved_to_lp();
+    let moved = unsafe{ v.get_moved_to_lp() };
     assert_eq!(v, moved);
-    let moved_back = moved.get_moved_to_main();
+    let moved_back = unsafe{ moved.get_moved_to_main() };
     assert_eq!(moved, moved_back);
     if v.as_ptr() == moved_back.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(v);
@@ -195,9 +195,9 @@ fn test_lpvec_correctly_modified() {
     v.push(10);
     v.push(20);
     v.push(30);
-    let mut moved = v.get_moved_to_lp();
+    let mut moved = unsafe{ v.get_moved_to_lp() };
     moved[1] = 50;
-    let moved_back = moved.get_moved_to_main();
+    let moved_back = unsafe{ moved.get_moved_to_main() };
     assert_eq!(moved_back[1], 50);
     if v.as_ptr() == moved_back.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(v);
