@@ -1,7 +1,6 @@
 use core::{fmt::Debug, mem::{self, MaybeUninit}, ops::{Deref, DerefMut}, ptr::NonNull};
 
-use crate::movableobject::MovableObject;
-use crate::lpalloc;
+use crate::{movableobject::MovableObject, lpalloc, EspCoproError};
 #[cfg(feature = "nottest")]
 use alloc::alloc;
 #[cfg(feature = "nottest")]
@@ -224,37 +223,38 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     }
 
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
-    pub(crate) fn write_to_lp(value : &T) -> * mut u8 { unsafe {
+    pub(crate) fn write_to_lp(value : &T) -> Result<* mut u8, EspCoproError> { unsafe {
         if let Some(existing_lp_addr) = 
             lpbox_static::get_by_main(value as *const T as * const () as usize) {
-            return existing_lp_addr as * mut u8;
+            return Ok(existing_lp_addr as * mut u8);
         }
-        let ptr = lpalloc::lp_allocator_alloc(core::alloc::Layout::for_value(value)) as * mut u8;
-        value.move_to_lp(ptr);
+        let ptr: *mut u8 = lpalloc::lp_allocator_alloc(core::alloc::Layout::for_value(value)) as * mut u8;
+        if ptr.is_null() { return Err(EspCoproError::OutOfMemory); }
+        value.move_to_lp(ptr)?;
         // ptr.copy_from(value, layout.size());
         // TODO: write_vtable
         // lpalloc::write_vtable(ptr as * mut u8, get_vtable(value) as * mut u8);
         lpbox_static::insert_no_drop(value as *const T as *mut T, ptr as usize);
-        ptr
+        Ok(ptr)
     }}
 
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
-    fn write_to_main(value : &T) -> * mut u8 { unsafe {
+    fn write_to_main(value : &T) -> Result<* mut u8, EspCoproError> { unsafe {
         let addr =
             lpbox_static::remove_by_lp(value as * const T as * const () as usize)
                 .map_or_else(|| lpbox_alloc(core::alloc::Layout::for_value(value)) as usize,
                     |a| a.0);
-        value.move_to_main(addr as * mut u8);
-        addr as * mut u8
+        value.move_to_main(addr as * mut u8)?;
+        Ok(addr as * mut u8)
     }}
 
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
-    pub unsafe fn get_moved_to_lp(&self) -> LPBox<T>{
-        unsafe { LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_lp(self.0.as_ref()) as usize)))}
+    pub unsafe fn get_moved_to_lp(&self) -> Result<LPBox<T>, EspCoproError> {
+        unsafe { Ok(LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_lp(self.0.as_ref())? as usize))) )}
     }
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
-    pub unsafe fn get_moved_to_main(&self) -> LPBox<T> {
-        unsafe { LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_main(self.0.as_ref()) as usize))) }
+    pub unsafe fn get_moved_to_main(&self) -> Result<LPBox<T>, EspCoproError> {
+        unsafe { Ok(LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_main(self.0.as_ref())? as usize))) )}
     }
     // call the main processor's function.
     // #[cfg(feature = "is-lp-core")]
@@ -267,7 +267,7 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
 impl<T: ?Sized + MovableObject> MovableObject for LPBox<T> {
     #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_main(&self, dest: *mut u8) -> Result<(), crate::EspCoproError> {
-        unsafe { (dest as *mut LPBox<T>).write_volatile(self.get_moved_to_main()); }
+        unsafe { (dest as *mut LPBox<T>).write_volatile(self.get_moved_to_main()?); }
         Ok(())
     }
     #[cfg(feature = "is-lp-core")]
@@ -277,7 +277,7 @@ impl<T: ?Sized + MovableObject> MovableObject for LPBox<T> {
 
     #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_lp(&self, dest: *mut u8) -> Result<(), crate::EspCoproError> {
-        unsafe { (dest as *mut LPBox<T>).write_volatile(self.get_moved_to_lp()); }
+        unsafe { (dest as *mut LPBox<T>).write_volatile(self.get_moved_to_lp()?); }
         Ok(())
     }
     #[cfg(feature = "is-lp-core")]

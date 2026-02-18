@@ -50,7 +50,7 @@ impl core::fmt::Display for EspCoproError {
 pub mod transfer_functions {
     use crate::{lpbox::{LPBox, cleanup, remove_by_main}, movableobject::MovableObject};
     use crate::EspCoproError;
-    pub fn transfer_to_lp<T : MovableObject>(src : &T) -> *mut u8 {
+    pub fn transfer_to_lp<T : MovableObject>(src : &T) -> Result<*mut u8, EspCoproError> {
         LPBox::<T>::write_to_lp(src)
     }
 

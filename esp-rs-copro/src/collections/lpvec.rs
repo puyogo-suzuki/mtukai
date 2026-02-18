@@ -919,10 +919,10 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), EspCoproError> {
         let dest = dest as * mut Self;
-        let dst_ptr = crate::lpbox::LPBox::<[T]>::write_to_lp(self.as_slice());
+        let dst_ptr = crate::lpbox::LPBox::<[T]>::write_to_lp(self.as_slice())?;
         unsafe {
             dest.write_volatile(LPVec {
-                vec_inner : LPVecInner::from_raw_parts(dst_ptr as * mut u8, self.capacity()),
+                vec_inner : LPVecInner::from_raw_parts(dst_ptr, self.capacity()),
                 len : self.len(),
                 _marker : PhantomData
             });

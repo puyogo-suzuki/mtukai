@@ -73,8 +73,8 @@ impl<T : MovableObject> MovableObject for Option<T> {
 }
 
 impl MovableObject for () {
-    unsafe fn move_to_main(&self, dest: *mut u8) -> Result<(), EspCoproError> { Ok(()) }
-    unsafe fn move_to_lp(&self, dest: *mut u8) -> Result<(), EspCoproError> { Ok(()) }
+    unsafe fn move_to_main(&self, _dest: *mut u8) -> Result<(), EspCoproError> { Ok(()) }
+    unsafe fn move_to_lp(&self, _dest: *mut u8) -> Result<(), EspCoproError> { Ok(()) }
 }
 
 // We only support MaybeUninit of Copy types, because otherwise we would need to move the value out of the MaybeUninit in order to move it, which would prevent us from leaving the original MaybeUninit uninitialized in the case where the value is not actually initialized.

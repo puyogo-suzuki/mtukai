@@ -1,6 +1,4 @@
-use esp_rs_copro::{collections::lpvec::LPVec, movableobject::MovableObject, lpadapter::LPAdapter};
-use std::ops::Deref;
-use std::ptr;
+use esp_rs_copro::{collections::lpvec::LPVec, movableobject::MovableObject, lpadapter::LPAdapter, EspCoproError};
 use std::mem::size_of;
 
 #[test]
@@ -17,8 +15,8 @@ impl Drop for DropCount<'_> {
     }
 }
 impl MovableObject for DropCount<'_> {
-    unsafe fn move_to_main(&self, dest : *mut u8) {}
-    unsafe fn move_to_lp(&self, dest : *mut u8) {}
+    unsafe fn move_to_main(&self, _dest : *mut u8) -> Result<(), EspCoproError> { Ok(()) }
+    unsafe fn move_to_lp(&self, _dest : *mut u8) -> Result<(), EspCoproError> { Ok(()) }
 }
 
 #[test]

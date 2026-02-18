@@ -232,7 +232,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                     unsafe { LpCoreCode::get_allocator().as_ref().unwrap().dealloc(ptr, layout); }
                 };
             }
-            let trans = transfer_to_lp(transfer_value);
+            let trans = transfer_to_lp(transfer_value)?;
             unsafe {((#a) as *mut *mut u8).write_volatile(trans);}
         },
         quote!{unsafe { transfer_to_main(((#a) as *mut *mut u8).read_volatile(), transfer_value) } })

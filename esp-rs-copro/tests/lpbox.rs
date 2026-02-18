@@ -1,8 +1,5 @@
-use esp_rs_copro::collections::lpveccopy::LPVecCopy;
-use esp_rs_copro::lpalloc::in_lp_mem_range;
-use esp_rs_copro::{lpbox::LPBox, lpalloc};
-use rand::{Rng, SeedableRng};
-use rand::rngs::StdRng;
+use esp_rs_copro::{lpbox::LPBox, lpalloc, lpalloc::in_lp_mem_range, EspCoproError, collections::lpveccopy::LPVecCopy};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 
 /// This is just tests for LPBox.
 /// The common way is too far from these code.
@@ -15,41 +12,44 @@ struct TestStruct {
 }
 
 #[test]
-fn test_lpbox_alloc() {
+fn test_lpbox_alloc() -> Result<(), EspCoproError> {
     lpalloc::lp_allocator_init();
     let original = TestStruct { value1: 10, value2: 20 };
     let lpbox = LPBox::new(original);
-    let lp_ptr = unsafe{ lpbox.get_moved_to_lp() };
+    let lp_ptr = unsafe{ lpbox.get_moved_to_lp()? };
     assert!(lpalloc::in_lp_mem_range(lp_ptr.as_ptr()));
+    Ok(())
 }
 
 #[test]
-fn test_lpbox_transfer() {
+fn test_lpbox_transfer() -> Result<(), EspCoproError> {
     lpalloc::lp_allocator_init();
     let original = TestStruct { value1: 10, value2: 20 };
     let lpbox = LPBox::new(original);
-    let mut lp_ptr = unsafe{ lpbox.get_moved_to_lp() };
+    let mut lp_ptr = unsafe{ lpbox.get_moved_to_lp()? };
     lp_ptr.value1 = 30;
     lp_ptr.value2 = 40;
     assert_eq!(lpbox.value1, 10);
     assert_eq!(lpbox.value2, 20);
-    let moved = unsafe{ lp_ptr.get_moved_to_main() };
+    let moved = unsafe{ lp_ptr.get_moved_to_main()? };
     if lpbox.as_ptr() == moved.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
     }
     assert_eq!(moved.value1, 30);
     assert_eq!(moved.value2, 40);
+    Ok(())
 }
 
 #[test]
-fn test_addresstranslation_identical() {
+fn test_addresstranslation_identical() -> Result<(), EspCoproError> {
     lpalloc::lp_allocator_init();
     let original = TestStruct { value1: 10, value2: 20 };
     let lpbox = LPBox::new(original);
-    let lp_ptr = unsafe{ lpbox.get_moved_to_lp() };
-    let moved = unsafe{ lp_ptr.get_moved_to_main() };
+    let lp_ptr = unsafe{ lpbox.get_moved_to_lp()? };
+    let moved = unsafe{ lp_ptr.get_moved_to_main()? };
     assert_eq!(lpbox.as_ptr(), moved.as_ptr());
     let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
+    Ok(())
 }
 
 #[test]
@@ -88,22 +88,23 @@ fn gen_random_linked_list(depth: u32, rng: &mut StdRng) -> TestLinkedList {
 static RAND_SEED: [u8; 32] = [5u8; 32];
 
 #[test]
-fn test_linked_list_same_value() {
+fn test_linked_list_same_value() -> Result<(), EspCoproError> {
     lpalloc::lp_allocator_init();
     let mut rng = StdRng::from_seed(RAND_SEED);
     let lpbox = LPBox::new(gen_random_linked_list(5, &mut rng));
-    let lp_ptr = unsafe{ lpbox.get_moved_to_lp() };
+    let lp_ptr = unsafe{ lpbox.get_moved_to_lp()? };
     assert_eq!(*lpbox, *lp_ptr);
-    let moved = unsafe{ lp_ptr.get_moved_to_main() };
+    let moved = unsafe{ lp_ptr.get_moved_to_main()? };
     if lpbox.as_ptr() == moved.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
     }
     assert_eq!(*moved, *lp_ptr);
+    Ok(())
 }
 
 
 #[test]
-fn test_linked_list_correctly_moved() {
+fn test_linked_list_correctly_moved() -> Result<(), EspCoproError> {
     fn check_is_in_lp_mem_range(is_in : bool, node : &LPBox<TestLinkedList>) {
         let mut cur = node;
         loop {
@@ -119,17 +120,18 @@ fn test_linked_list_correctly_moved() {
     lpalloc::lp_allocator_init();
     let mut rng = StdRng::from_seed(RAND_SEED);
     let lpbox = LPBox::new(gen_random_linked_list(5, &mut rng));
-    let lp_ptr = unsafe{ lpbox.get_moved_to_lp() };
+    let lp_ptr = unsafe{ lpbox.get_moved_to_lp()? };
     check_is_in_lp_mem_range(true, &lp_ptr);
-    let moved = unsafe{ lp_ptr.get_moved_to_main() };
+    let moved = unsafe{ lp_ptr.get_moved_to_main()? };
     check_is_in_lp_mem_range(false, &moved);
     if lpbox.as_ptr() == moved.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
     }
+    Ok(())
 }
 
 #[test]
-fn test_linked_list_correctly_modified() {
+fn test_linked_list_correctly_modified() -> Result<(), EspCoproError> {
     fn twice(node: &mut LPBox<TestLinkedList>) {
         let mut cur = node;
         loop {
@@ -145,63 +147,67 @@ fn test_linked_list_correctly_modified() {
     let mut rng = StdRng::from_seed(RAND_SEED);
     let original = gen_random_linked_list(5, &mut rng);
     let lpbox = LPBox::new(original.copy());
-    let mut lp_ptr = unsafe{ lpbox.get_moved_to_lp() };
+    let mut lp_ptr = unsafe{ lpbox.get_moved_to_lp()? };
     twice(&mut lp_ptr);
-    let moved = unsafe{ lp_ptr.get_moved_to_main() };
+    let moved = unsafe{ lp_ptr.get_moved_to_main()? };
     if lpbox.as_ptr() == moved.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(lpbox);
     }
     assert_eq!(*lp_ptr, *moved);
     assert_ne!(*moved, original);
+    Ok(())
 }
 
 #[test]
-fn test_lpvec_alloc() {
+fn test_lpvec_alloc() -> Result<(), EspCoproError> {
     lpalloc::lp_allocator_init();
     let mut v = LPBox::new(LPVecCopy::new());
     v.push(10);
     v.push(40);
     v.push(20);
     assert!(!in_lp_mem_range((*v).as_ptr()));
-    let moved = unsafe{ v.get_moved_to_lp() };
+    let moved = unsafe{ v.get_moved_to_lp()? };
     assert!(in_lp_mem_range((*moved).as_ptr()));
-    let moved_back = unsafe{ moved.get_moved_to_main() };
+    let moved_back = unsafe{ moved.get_moved_to_main()? };
     assert!(!in_lp_mem_range((*moved_back).as_ptr()));
     if v.as_ptr() == moved_back.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(v);
     }
+    Ok(())
 }
 
 #[test]
-fn test_lpvec_correctly_moved() {
+fn test_lpvec_correctly_moved() -> Result<(), EspCoproError> {
     lpalloc::lp_allocator_init();
     let mut v = LPBox::new(LPVecCopy::new());
     v.push(10);
     v.push(40);
     v.push(20);
-    let moved = unsafe{ v.get_moved_to_lp() };
+    let moved = unsafe{ v.get_moved_to_lp()? };
     assert_eq!(v, moved);
-    let moved_back = unsafe{ moved.get_moved_to_main() };
+    let moved_back = unsafe{ moved.get_moved_to_main()? };
     assert_eq!(moved, moved_back);
     if v.as_ptr() == moved_back.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(v);
     }
+    Ok(())
 }
 
 #[test]
-fn test_lpvec_correctly_modified() {
+fn test_lpvec_correctly_modified() -> Result<(), EspCoproError> {
     lpalloc::lp_allocator_init();
     let mut v = LPBox::new(LPVecCopy::new());
     v.push(10);
     v.push(20);
     v.push(30);
-    let mut moved = unsafe{ v.get_moved_to_lp() };
+    let mut moved = unsafe{ v.get_moved_to_lp()? };
     moved[1] = 50;
-    let moved_back = unsafe{ moved.get_moved_to_main() };
+    let moved_back = unsafe{ moved.get_moved_to_main()? };
     assert_eq!(moved_back[1], 50);
     if v.as_ptr() == moved_back.as_ptr() {
         let _dont_drop = core::mem::ManuallyDrop::new(v);
     }
+    Ok(())
 }
 
 // TODO: check the exapansion of LPVec in the LP memory. It is hard to check the expansion with a current custom allocator.
