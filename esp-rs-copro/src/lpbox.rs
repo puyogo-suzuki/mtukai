@@ -60,6 +60,7 @@ pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
 
 #[cfg(feature = "has-lp-core")]
 pub(crate) mod lpbox_static {
+    // WE ASUME THAT lpbox_static IS ONLY USED ON SINGLE THREADED PROGRAMS.
     use crate::addresstranslation::AddressTranslationTable;
     use core::{alloc::Layout, cell::{Cell, Ref, RefCell, RefMut}};
 

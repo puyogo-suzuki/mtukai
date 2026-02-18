@@ -102,7 +102,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     
     let copro_crate_use = if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-rs-copro") {
         let ident = Ident::new(name, Span::call_site().into());
-        quote!{use #ident ::{ transfer_functions::*, lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject};}
+        quote!{use #ident ::{ transfer_functions::*, lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject, EspCoproError};}
     } else { quote!{} };
 
     let lit: LitStr = match syn::parse(input) {
@@ -235,7 +235,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
             let trans = transfer_to_lp(transfer_value);
             unsafe {((#a) as *mut *mut u8).write_volatile(trans);}
         },
-        quote!{transfer_to_main(transfer_value, unsafe{((#a) as *mut *mut u8).read_volatile()});})
+        quote!{unsafe { transfer_to_main(((#a) as *mut *mut u8).read_volatile(), transfer_value) } })
     } else { (quote! {}, quote! {})};
     let allocsym = obj_file.symbols().find(|s| s.name().map_or(false, |v| v.starts_with("__COPRO_ALLOCATOR_")));
     let (allocfun, lpalloc) = if let Some(a) = allocsym {
@@ -280,7 +280,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                     rtc : &mut Rtc,
                     transfer_value : &mut T,
                     #(_: #args),*
-                ) {
+                ) -> Result<(), EspCoproError> {
                     #alloccall
                     lp_core.run(wakeup_source);
                     rtc.sleep_light(&[&WakeFromLpCoreWakeupSource::new()]);

@@ -29,17 +29,27 @@ mod addresstranslation;
 #[macro_use]
 extern crate esp_println;
 
+pub enum EspCoproError {
+    IncorrectlyTransferred,
+    OutOfMemory
+}
+
 #[cfg(feature = "has-lp-core")]
 pub mod transfer_functions {
     use crate::{lpbox::{LPBox, cleanup, remove_by_main}, movableobject::MovableObject};
-
+    use crate::EspCoproError;
     pub fn transfer_to_lp<T : MovableObject>(src : &T) -> *mut u8 {
         LPBox::<T>::write_to_lp(src)
     }
 
-    pub fn transfer_to_main<T : MovableObject>(src : &mut T, dst : * mut u8) {
-        unsafe{(dst as * mut T).as_ref().unwrap().move_to_main(src as * const T as * mut u8);}
-        remove_by_main(src as * const T as usize);
-        cleanup();
+    pub unsafe fn transfer_to_main<T : MovableObject>(src : * const u8, dst : &mut T) -> Result<(), EspCoproError> {
+        if let Some(v) = unsafe{(src as * const T).as_ref()} {
+            unsafe{v.move_to_main(dst as * mut T as * mut u8);}
+            remove_by_main(dst as * mut T as usize);
+            cleanup();
+            Ok(())
+        } else {
+            Err(EspCoproError::IncorrectlyTransferred)
+        }
     }
 }
