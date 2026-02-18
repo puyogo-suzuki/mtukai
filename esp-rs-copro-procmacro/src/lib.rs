@@ -319,22 +319,24 @@ pub fn movable_object_derive(input: TokenStream) -> TokenStream {
                 }
             }).collect::<Vec<_>>();
             let move_to_mains = member_names.iter().map(|name| {
-                quote! {self.#name.wrap_move_to_main( (&mut (*dest).#name) as * mut _ as * mut u8);}
+                quote! {self.#name.wrap_move_to_main( (&mut (*dest).#name) as * mut _ as * mut u8)?;}
             });
             let move_to_lps = member_names.iter().map(|name| {
-                quote! {self.#name.wrap_move_to_lp( (&mut (*dest).#name) as * mut _ as * mut u8);}
+                quote! {self.#name.wrap_move_to_lp( (&mut (*dest).#name) as * mut _ as * mut u8)?;}
             });
             let expanded = quote! {
                 impl #esp_copro_crate::movableobject::MovableObject for #name {
-                    unsafe fn move_to_main(&self, dest : *mut u8) {
+                    unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), #esp_copro_crate::EspCoproError> {
                         use #esp_copro_crate::movableobjectwrapper::*;
                         let dest = dest as * mut #name;
                         #(#move_to_mains)*
+                        Ok(())
                     }
-                    unsafe fn move_to_lp(&self, dest : *mut u8) {
+                    unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), #esp_copro_crate::EspCoproError> {
                         use #esp_copro_crate::movableobjectwrapper::*;
                         let dest = dest as * mut #name;
                         #(#move_to_lps)*
+                        Ok(())
                     }
                 }
             };
@@ -353,7 +355,7 @@ pub fn movable_object_derive(input: TokenStream) -> TokenStream {
                     quote! { let mut #ident = core::mem::MaybeUninit::<#ty>::uninit(); }
                 });
                 let move_to_mains = field_names.iter().zip(dsts.iter()).map(|(src, dst)| {
-                    quote! { #src.#fname_move_to( (&mut #dst) as * mut _ as * mut u8); }
+                    quote! { #src.#fname_move_to( (&mut #dst) as * mut _ as * mut u8)?; }
                 });
                 quote! {
                     #name::#vname ( #(#field_names),* ) => {
@@ -377,7 +379,7 @@ pub fn movable_object_derive(input: TokenStream) -> TokenStream {
                     quote! { let mut #ident = core::mem::MaybeUninit::<#ty>::uninit(); }
                 });
                 let move_to_mains = field_names.iter().zip(dsts.iter()).map(|(src, dst)| {
-                    quote! { #src.#fname_move_to( (&mut #dst) as * mut _ as * mut u8); }
+                    quote! { #src.#fname_move_to( (&mut #dst) as * mut _ as * mut u8)?; }
                 });
                 let constructions = field_names.iter().zip(dsts.iter()).map(|(src, dst)| {
                     quote! { #src : #dst.assume_init() }
@@ -410,17 +412,19 @@ pub fn movable_object_derive(input: TokenStream) -> TokenStream {
             });
             quote! {
                 impl #esp_copro_crate::movableobject::MovableObject for #name {
-                    unsafe fn move_to_main(&self, dest : *mut u8) {
+                    unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), #esp_copro_crate::EspCoproError> {
                         use #esp_copro_crate::movableobjectwrapper::*;
                         unsafe { (dest as * mut #name).write_volatile(match &self {
                             #(#arms_main)*
                         }); }
+                        Ok(())
                     }
-                    unsafe fn move_to_lp(&self, dest : *mut u8) {
+                    unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), #esp_copro_crate::EspCoproError> {
                         use #esp_copro_crate::movableobjectwrapper::*;
                         unsafe { (dest as * mut #name).write_volatile(match &self {
                             #(#arms_lp)*
                         }); }
+                        Ok(())
                     }
                 }
             }.into()

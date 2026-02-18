@@ -1,4 +1,4 @@
-use crate::movableobject::MovableObject;
+use crate::{movableobject::MovableObject, EspCoproError};
 
 /// A wrapper for low-power I2C peripheral that can be used in the LP core.
 /// This struct is a movable object and can be transferred between the main core and the LP core.
@@ -85,11 +85,13 @@ impl LPI2C {
 }
 
 impl MovableObject for LPI2C {
-    unsafe fn move_to_main(&self, _dest : *mut u8) {
+    unsafe fn move_to_main(&self, _dest : *mut u8) -> Result<(), EspCoproError> {
         // Do nothing, LPI2C is a zero sized type.
+        Ok(())
     }
 
-    unsafe fn move_to_lp(&self, _dest : *mut u8) {
+    unsafe fn move_to_lp(&self, _dest : *mut u8) -> Result<(), EspCoproError> {
         // Do nothing, LPI2C is a zero sized type.
+        Ok(())
     }
 }

@@ -29,9 +29,21 @@ mod addresstranslation;
 #[macro_use]
 extern crate esp_println;
 
+#[derive(Debug, Hash, Clone, Copy, Eq, PartialEq)]
 pub enum EspCoproError {
+    NotAllowed,
     IncorrectlyTransferred,
     OutOfMemory
+}
+
+impl core::fmt::Display for EspCoproError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            EspCoproError::NotAllowed => write!(f, "EspCoproError::NotAllowed"),
+            EspCoproError::IncorrectlyTransferred => write!(f, "T  EspCoproError::IncorrectlyTransferred"),
+            EspCoproError::OutOfMemory => write!(f, "EspCoproError::OutOfMemory"),
+        }
+    }
 }
 
 #[cfg(feature = "has-lp-core")]
@@ -44,7 +56,7 @@ pub mod transfer_functions {
 
     pub unsafe fn transfer_to_main<T : MovableObject>(src : * const u8, dst : &mut T) -> Result<(), EspCoproError> {
         if let Some(v) = unsafe{(src as * const T).as_ref()} {
-            unsafe{v.move_to_main(dst as * mut T as * mut u8);}
+            unsafe{v.move_to_main(dst as * mut T as * mut u8)?;}
             remove_by_main(dst as * mut T as usize);
             cleanup();
             Ok(())

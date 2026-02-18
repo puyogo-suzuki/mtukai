@@ -4,7 +4,7 @@
 /// https://github.com/rust-lang/rust
 
 use core::{slice, fmt, iter, mem::{ManuallyDrop, MaybeUninit}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull}, slice::SliceIndex};
-use crate::{collections::lpvec::{ExtendFromWithinSpec, LPTryReserveError, LPVec, SpecExtend}, lpadapter::{LPAdapter, LPAdapterSliceConvert}, lpbox::LPBox, movableobject::MovableObject};
+use crate::{collections::lpvec::{ExtendFromWithinSpec, LPTryReserveError, LPVec, SpecExtend}, lpadapter::{LPAdapter, LPAdapterSliceConvert}, lpbox::LPBox, movableobject::MovableObject, EspCoproError};
 
 #[cfg(feature = "nottest")]
 use ::alloc::{boxed::Box, vec::Vec};
@@ -375,25 +375,27 @@ impl<T: PartialEq + Copy> LPVecCopy<T> {
 
 impl<T : Copy> MovableObject for LPVecCopy<T> {
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
-    unsafe fn move_to_lp(&self, dest : *mut u8) {
+    unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), EspCoproError> {
         use core::ptr::addr_of_mut;
         let dest = dest as * mut Self;
-        unsafe { self.vec_inner.move_to_lp(addr_of_mut!((*dest).vec_inner) as * mut u8); }
+        unsafe { self.vec_inner.move_to_lp(addr_of_mut!((*dest).vec_inner) as * mut u8)?; }
+        Ok(())
     }
 
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
-    unsafe fn move_to_main(&self, dest : *mut u8) {
+    unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), EspCoproError> {
         use core::ptr::addr_of_mut;
         let dest = dest as * mut Self;
-        unsafe { self.vec_inner.move_to_main(addr_of_mut!((*dest).vec_inner) as * mut u8); }
+        unsafe { self.vec_inner.move_to_main(addr_of_mut!((*dest).vec_inner) as * mut u8)?; }
+        Ok(())
     }
     #[cfg(feature = "is-lp-core")]
-    unsafe fn move_to_main(&self, _dest : *mut u8) {
-        unimplemented!()
+    unsafe fn move_to_main(&self, _dest : *mut u8) -> Result<(), EspCoproError> {
+        Err(EspCoproError::NotAllowed)
     }
     #[cfg(feature = "is-lp-core")]
-    unsafe fn move_to_lp(&self, _dest : *mut u8) {
-        unimplemented!()
+    unsafe fn move_to_lp(&self, _dest : *mut u8) -> Result<(), EspCoproError> {
+        Err(EspCoproError::NotAllowed)
     }
 }
 

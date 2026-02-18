@@ -4,7 +4,7 @@
 /// https://github.com/rust-lang/rust
 
 use core::{alloc::Layout, slice, fmt, intrinsics, iter, marker::PhantomData, mem::{self, ManuallyDrop, MaybeUninit, SizedTypeProperties}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull, Unique}, slice::SliceIndex};
-use crate::{lpadapter::LPAdapter, lpbox::LPBox, movableobject::MovableObject};
+use crate::{lpadapter::LPAdapter, lpbox::LPBox, movableobject::MovableObject, EspCoproError};
 
 #[cfg(feature = "nottest")]
 use ::alloc::{alloc, boxed::Box, vec::Vec};
@@ -917,7 +917,7 @@ impl<T : MovableObject, const N: usize> LPVec<[T; N]> {
 
 impl<T : MovableObject> MovableObject for LPVec<T> {
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
-    unsafe fn move_to_lp(&self, dest : *mut u8) {
+    unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), EspCoproError> {
         let dest = dest as * mut Self;
         let dst_ptr = crate::lpbox::LPBox::<[T]>::write_to_lp(self.as_slice());
         unsafe {
@@ -927,10 +927,11 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
                 _marker : PhantomData
             });
         }
+        Ok(())
     }
 
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
-    unsafe fn move_to_main(&self, dest : *mut u8) {
+    unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), EspCoproError> {
         let dest = dest as * mut Self;
         let dst_ptr = unsafe {
             let src = self.as_slice();
@@ -949,7 +950,7 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
                         a.0
                     }
                 });
-            src.move_to_main(addr as * mut u8);
+            src.move_to_main(addr as * mut u8)?;
             addr as * mut u8
         };
         unsafe {
@@ -959,14 +960,15 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
                 _marker : PhantomData
             });
         }
+        Ok(())
     }
     #[cfg(feature = "is-lp-core")]
-    unsafe fn move_to_main(&self, _dest : *mut u8) {
-        unimplemented!()
+    unsafe fn move_to_main(&self, _dest : *mut u8) -> Result<(), EspCoproError> {
+        Err(EspCoproError::NotAllowed)
     }
     #[cfg(feature = "is-lp-core")]
-    unsafe fn move_to_lp(&self, _dest : *mut u8) {
-        unimplemented!()
+    unsafe fn move_to_lp(&self, _dest : *mut u8) -> Result<(), EspCoproError> {
+        Err(EspCoproError::NotAllowed)
     }
 }
 

@@ -74,7 +74,9 @@ fn sht30_main() -> !{
             measurement_count : 5
         };
         println!("lpcore run");
-        lp_core_code.run_light_sleep(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut Rtc::new(peripherals.LPWR), &mut parcel, lp_pin);
+        if let Err(e) = lp_core_code.run_light_sleep(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut Rtc::new(peripherals.LPWR), &mut parcel, lp_pin) {
+            println!("Error running LP core: {}", e);
+        }
         for i in parcel.result.iter() {
             match i {
                 Some(i) => {
