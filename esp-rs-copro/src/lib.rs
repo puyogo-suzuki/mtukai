@@ -13,6 +13,7 @@
 #![feature(cast_maybe_uninit)]
 #![feature(trusted_len)]
 #![feature(exact_size_is_empty)]
+#![feature(unsafe_cell_access)]
 #[cfg(feature = "nottest")]
 extern crate alloc;
 pub mod lpalloc;

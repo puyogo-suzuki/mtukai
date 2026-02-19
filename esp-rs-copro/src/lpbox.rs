@@ -61,58 +61,40 @@ pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
 pub(crate) mod lpbox_static {
     // WE ASUME THAT lpbox_static IS ONLY USED ON SINGLE THREADED PROGRAMS.
     use crate::addresstranslation::AddressTranslationTable;
-    use core::{alloc::Layout, cell::{Cell, Ref, RefCell, RefMut}};
+    use core::{alloc::Layout, cell::UnsafeCell};
 
-    pub(crate) static ADDRESS_TRANSLATION_TABLE : SyncImplementedRefCell<AddressTranslationTable> =
-        SyncImplementedRefCell::new(AddressTranslationTable::new());
-    static LPBOX_DROP_ENABLE : SyncImplementedBool = SyncImplementedBool::new(true);
-
-    pub(crate) struct SyncImplementedRefCell<T>(RefCell<T>);
-    impl<T> SyncImplementedRefCell<T> {
+    static ADDRESS_TRANSLATION_TABLE : SyncUnsafeCell<AddressTranslationTable> =
+        SyncUnsafeCell::new(AddressTranslationTable::new());
+    static LPBOX_DROP_ENABLE : SyncUnsafeCell<bool> = SyncUnsafeCell::new(true);
+    struct SyncUnsafeCell<T>(UnsafeCell<T>);
+    impl<T> SyncUnsafeCell<T> {
         pub const fn new(value: T) -> Self {
-            SyncImplementedRefCell(RefCell::new(value))
+            SyncUnsafeCell(UnsafeCell::new(value))
         }
-        pub fn borrow_mut(&self) -> RefMut<'_, T> {
-            self.0.borrow_mut()
-        }
-        pub fn borrow(&self) -> Ref<'_, T> {
-            self.0.borrow()
+        pub fn get(&self) -> & mut T {
+            unsafe{ self.0.as_mut_unchecked() }
         }
     }
-    unsafe impl<T> Sync for SyncImplementedRefCell<T> {}
-
-    struct SyncImplementedBool(Cell<bool>);
-    impl SyncImplementedBool {
-        pub const fn new(value: bool) -> Self {
-            SyncImplementedBool(Cell::new(value))
-        }
-        pub fn set(&self, value: bool) {
-            self.0.set(value);
-        }
-        pub fn get(&self) -> bool {
-            self.0.get()
-        }
-    }
-    unsafe impl Sync for SyncImplementedBool {}
+    unsafe impl<T> Sync for SyncUnsafeCell<T> {}
     pub fn cleanup() {
-        LPBOX_DROP_ENABLE.set(false);
-        ADDRESS_TRANSLATION_TABLE.borrow_mut().drop_and_clear();
-        LPBOX_DROP_ENABLE.set(true);
+        *LPBOX_DROP_ENABLE.get() = false;
+        ADDRESS_TRANSLATION_TABLE.get().drop_and_clear();
+        *LPBOX_DROP_ENABLE.get() = true;
     }
     pub fn check_lpbox_drop_enable() -> bool {
-        LPBOX_DROP_ENABLE.get()
+        *LPBOX_DROP_ENABLE.get()
     }
     pub fn remove_by_main(main: usize) -> Option<usize> {
-        ADDRESS_TRANSLATION_TABLE.borrow_mut().remove_by_main(main)
+        ADDRESS_TRANSLATION_TABLE.get().remove_by_main(main)
     }
     pub fn remove_by_lp(lp: usize) -> Option<(usize, Layout)> {
-        ADDRESS_TRANSLATION_TABLE.borrow_mut().remove_by_lp(lp)
+        ADDRESS_TRANSLATION_TABLE.get().remove_by_lp(lp)
     }
     pub(crate) fn get_by_main(main: usize) -> Option<usize> {
-        ADDRESS_TRANSLATION_TABLE.borrow().get_by_main(main)
+        ADDRESS_TRANSLATION_TABLE.get().get_by_main(main)
     }
     pub(crate) fn insert_no_drop<T : ?Sized>(main: *mut T, lp: usize) {
-        ADDRESS_TRANSLATION_TABLE.borrow_mut().insert_no_drop(main, lp);
+        ADDRESS_TRANSLATION_TABLE.get().insert_no_drop(main, lp);
     }
 }
 
