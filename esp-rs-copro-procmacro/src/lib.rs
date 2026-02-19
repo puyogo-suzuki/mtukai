@@ -102,7 +102,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     
     let copro_crate_use = if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-rs-copro") {
         let ident = Ident::new(name, Span::call_site().into());
-        quote!{use #ident ::{ transfer_functions::*, lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject, EspCoproError};}
+        quote!{ use #ident ::{ transfer_functions::*, lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject, EspCoproError, try_copro_lock, copro_unlock}; }
     } else { quote!{} };
 
     let lit: LitStr = match syn::parse(input) {
@@ -281,10 +281,13 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                     transfer_value : &mut T,
                     #(_: #args),*
                 ) -> Result<(), EspCoproError> {
+                    try_copro_lock()?;
                     #alloccall
                     lp_core.run(wakeup_source);
                     rtc.sleep_light(&[&WakeFromLpCoreWakeupSource::new()]);
-                    #transfer_back
+                    let ret = #transfer_back;
+                    copro_unlock();
+                    ret
                 }
                 #allocfun
             }

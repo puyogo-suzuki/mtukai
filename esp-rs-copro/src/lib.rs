@@ -14,6 +14,7 @@
 #![feature(trusted_len)]
 #![feature(exact_size_is_empty)]
 #![feature(unsafe_cell_access)]
+#![feature(cfg_target_has_atomic)]
 #[cfg(feature = "nottest")]
 extern crate alloc;
 pub mod lpalloc;
@@ -34,7 +35,23 @@ extern crate esp_println;
 pub enum EspCoproError {
     NotAllowed,
     IncorrectlyTransferred,
-    OutOfMemory
+    OutOfMemory,
+    InUse
+}
+#[cfg(target_has_atomic_load_store = "8")]
+pub static ESP_COPRO_MUTEX : core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+
+pub fn try_copro_lock() -> Result<(), EspCoproError> {
+    #[cfg(target_has_atomic_load_store = "8")]
+    if let Err(_) = ESP_COPRO_MUTEX.compare_exchange(false, true, core::sync::atomic::Ordering::Relaxed, core::sync::atomic::Ordering::Relaxed) {
+        return Err(EspCoproError::InUse);
+    }
+    Ok(())
+}
+
+pub fn copro_unlock() {
+    #[cfg(target_has_atomic_load_store = "8")]
+    ESP_COPRO_MUTEX.store(false, core::sync::atomic::Ordering::Relaxed);
 }
 
 impl core::fmt::Display for EspCoproError {
@@ -43,6 +60,7 @@ impl core::fmt::Display for EspCoproError {
             EspCoproError::NotAllowed => write!(f, "EspCoproError::NotAllowed"),
             EspCoproError::IncorrectlyTransferred => write!(f, "T  EspCoproError::IncorrectlyTransferred"),
             EspCoproError::OutOfMemory => write!(f, "EspCoproError::OutOfMemory"),
+            EspCoproError::InUse => write!(f, "EspCoproError::InUse")
         }
     }
 }
