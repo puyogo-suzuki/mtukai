@@ -92,7 +92,60 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     use parse::Error;
     use proc_macro::Span;
     use proc_macro_crate::{FoundCrate, crate_name};
-    use syn::{Ident, LitStr, parse};
+    use syn::{Ident, LitInt, LitStr, parse, Expr, Token, spanned::Spanned};
+
+    struct LoadLpArgs {
+        path: LitStr,
+        lp_start: Option<Expr>,
+        lp_length: Option<LitInt>,
+    }
+
+    impl parse::Parse for LoadLpArgs {
+        fn parse(input: parse::ParseStream) -> parse::Result<Self> {
+            let path: LitStr = input.parse()?;
+            let mut lp_start: Option<Expr> = None;
+            let mut lp_length: Option<LitInt> = None;
+
+            while input.peek(Token![,]) {
+                let _comma: Token![,] = input.parse()?;
+                if input.is_empty() {
+                    break;
+                }
+
+                let ident: Ident = input.parse()?;
+                let _eq: Token![=] = input.parse()?;
+                let value: Expr = input.parse()?;
+
+                if ident == "lp_start" {
+                    lp_start = Some(value);
+                } else if ident == "lp_length" {
+                    if lp_length.is_some() {
+                        return Err(parse::Error::new(ident.span(), "lp_length specified more than once."));
+                    }
+                    let lit = match value {
+                        Expr::Lit(expr_lit) => match expr_lit.lit {
+                            syn::Lit::Int(v) => v,
+                            _ => {
+                                return Err(parse::Error::new(expr_lit.lit.span(), "lp_length must be an integer literal."));
+                            }
+                        },
+                        _ => {
+                            return Err(parse::Error::new(value.span(), "lp_length must be an integer literal."));
+                        }
+                    };
+                    lp_length = Some(lit);
+                } else {
+                    return Err(parse::Error::new(ident.span(), "Unknown argument. Expected lp_start or lp_length."));
+                }
+            }
+
+            Ok(Self {
+                path,
+                lp_start,
+                lp_length,
+            })
+        }
+    }
 
     let hal_crate = if cfg!(any(feature = "is-lp-core", feature = "is-ulp-core")) {
         crate_name("esp-lp-hal")
@@ -112,12 +165,12 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         quote!{ use #ident ::{ transfer_functions::*, lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject, EspCoproError, try_copro_lock, copro_unlock}; }
     } else { quote!{} };
 
-    let lit: LitStr = match syn::parse(input) {
-        Ok(lit) => lit,
+    let args: LoadLpArgs = match syn::parse(input) {
+        Ok(args) => args,
         Err(e) => return e.into_compile_error().into(),
     };
 
-    let elf_file = lit.value();
+    let elf_file = args.path.value();
 
     if !Path::new(&elf_file).exists() {
         return Error::new(Span::call_site().into(), "File not found")
@@ -188,7 +241,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     };
 
     let magic_symbol = magic_symbol.trim_start_matches("__ULP_MAGIC_");
-    let args: Vec<proc_macro2::TokenStream> = magic_symbol
+    let run_light_sleep_args : Vec<proc_macro2::TokenStream> = magic_symbol
         .split("$")
         .map(|t| {
             let t = if t.contains("OutputOpenDrain") {
@@ -227,29 +280,29 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     #[cfg(feature = "has-ulp-core")]
     let rtc_code_start = quote! { _rtc_slow_data_start };
 
-    let (transfer, transfer_back) = if let Some(a) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_TRANSFER")).map(|s| s.address()) {
-        (quote!{
-            unsafe {
-                lp_alloc_func = |layout| { 
+    let (transfer, transfer_back) =
+        if let Some(a) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_TRANSFER")).map(|s| s.address()) {
+            (quote!{
+                unsafe {
                     use core::alloc::GlobalAlloc;
-                    unsafe { LpCoreCode::get_allocator().as_ref().unwrap().alloc(layout) }
-                }; 
-                lp_dealloc_func = |ptr, layout| {
-                    use core::alloc::GlobalAlloc;
-                    unsafe { LpCoreCode::get_allocator().as_ref().unwrap().dealloc(ptr, layout); }
-                };
-                lp_get_lp_mem_begin_and_len = || {
-                    unsafe {
-                        let alc = LpCoreCode::get_allocator().as_ref().unwrap();
-                        (alc.heap.as_ptr() as usize, alc.heap.len())
-                    }
-                };
-            }
-            let trans = transfer_to_lp(transfer_value)?;
-            unsafe {((#a) as *mut *mut u8).write_volatile(trans);}
-        },
-        quote!{unsafe { transfer_to_main(((#a) as *mut *mut u8).read_volatile(), transfer_value) } })
-    } else { (quote! {}, quote! {})};
+                    lp_alloc_func = |layout| { 
+                        unsafe { LpCoreCode::get_allocator().as_ref().unwrap().alloc(layout) }
+                    }; 
+                    lp_dealloc_func = |ptr, layout| {
+                        unsafe { LpCoreCode::get_allocator().as_ref().unwrap().dealloc(ptr, layout); }
+                    };
+                    lp_get_lp_mem_begin_and_len = || {
+                        unsafe {
+                            let alc = LpCoreCode::get_allocator().as_ref().unwrap();
+                            (alc.heap.as_ptr() as usize, alc.heap.len())
+                        }
+                    };
+                }
+                let trans = transfer_to_lp(transfer_value)?;
+                unsafe {((#a) as *mut *mut u8).write_volatile(trans);}
+            },
+            quote!{unsafe { transfer_to_main(((#a) as *mut *mut u8).read_volatile(), transfer_value) } })
+        } else { (quote! {}, quote! {})};
     let allocsym = obj_file.symbols().find(|s| s.name().map_or(false, |v| v.starts_with("__COPRO_ALLOCATOR_")));
     let (allocfun, lpalloc) = if let Some(a) = allocsym {
         let addr = a.address();
@@ -266,6 +319,31 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         unsafe{all.as_mut().unwrap().init()};
         #transfer
     }} else {quote!{}};
+
+    let copy_dest = if let Some(lp_start) = args.lp_start {
+        quote! { (#lp_start as *mut u8) }
+    } else {
+        quote! { &#rtc_code_start as *const u32 as *mut u8 }
+    };
+
+    if let Some(lp_length) = &args.lp_length {
+        let limit = match lp_length.base10_parse::<usize>() {
+            Ok(v) => v,
+            Err(_) => {
+                return Error::new(lp_length.span(), "lp_length must be a valid integer literal.")
+                    .to_compile_error()
+                    .into();
+            }
+        };
+        if binary.len() > limit {
+            return Error::new(
+                lp_length.span(),
+                "LP_CODE length exceeds lp_length.",
+            )
+            .to_compile_error()
+            .into();
+        }
+    }
     
     quote! {
         {
@@ -280,7 +358,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
             }
 
             unsafe {
-                core::ptr::copy_nonoverlapping(LP_CODE as *const _ as *const u8, &#rtc_code_start as *const u32 as *mut u8, LP_CODE.len());
+                core::ptr::copy_nonoverlapping(LP_CODE as *const _ as *const u8, #copy_dest, LP_CODE.len());
             }
 
             #lpalloc
@@ -292,7 +370,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                     wakeup_source: LpCoreWakeupSource,
                     rtc : &mut Rtc,
                     transfer_value : &mut T,
-                    #(_: #args),*
+                    #(_: #run_light_sleep_args),*
                 ) -> Result<(), EspCoproError> {
                     try_copro_lock()?;
                     #alloccall
