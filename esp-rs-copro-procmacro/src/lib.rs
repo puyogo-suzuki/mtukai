@@ -56,8 +56,10 @@ pub fn esp_rs_copro_statics(_attr: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn define_lp_allocator(_input: TokenStream) -> TokenStream {
     quote!{
-        static mut lp_alloc_func : fn(layout: core::alloc::Layout) -> * mut u8 = |lay| {println!("illegal!"); 0 as * mut u8 };
+        static mut lp_alloc_func : fn(layout: core::alloc::Layout) -> * mut u8 = |lay| {0 as * mut u8 };
         static mut lp_dealloc_func : fn(pts : * mut u8, layout: core::alloc::Layout) -> () = |a, b| { };
+        #[allow(unused)]
+        static mut lp_get_lp_mem_begin_and_len : fn() -> (usize, usize) = || {(0, 0)};
         #[unsafe(no_mangle)]
         pub extern "Rust" fn __lpcoproc_allocator_alloc(layout: core::alloc::Layout) -> * mut u8 {
             unsafe{lp_alloc_func(layout)}
@@ -65,6 +67,11 @@ pub fn define_lp_allocator(_input: TokenStream) -> TokenStream {
         #[unsafe(no_mangle)]
         pub extern "Rust" fn __lpcoproc_allocator_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
             unsafe{lp_dealloc_func(ptr, layout)};
+        }
+        #[allow(unused)]
+        #[unsafe(no_mangle)]
+        pub extern "Rust" fn __lpcoproc_allocator_get_lp_mem_begin_and_len() -> (usize, usize) {
+            unsafe{lp_get_lp_mem_begin_and_len()}
         }
     }.into()
 }
@@ -230,6 +237,12 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                 lp_dealloc_func = |ptr, layout| {
                     use core::alloc::GlobalAlloc;
                     unsafe { LpCoreCode::get_allocator().as_ref().unwrap().dealloc(ptr, layout); }
+                };
+                lp_get_lp_mem_begin_and_len = || {
+                    unsafe {
+                        let alc = LpCoreCode::get_allocator().as_ref().unwrap();
+                        (alc.heap.as_ptr() as usize, alc.heap.len())
+                    }
                 };
             }
             let trans = transfer_to_lp(transfer_value)?;

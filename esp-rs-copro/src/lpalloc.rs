@@ -57,6 +57,10 @@ unsafe extern "Rust" {
     
     #[link_name = "__lpcoproc_allocator_dealloc"]
     pub(crate) fn lp_allocator_dealloc(ptr: * mut u8, layout: Layout);
+
+    #[cfg(any(not(any(feature = "esp32c6")), feature = "custom_range"))]
+    #[link_name = "__lpcoproc_allocator_get_lp_mem_begin_and_len"]
+    pub(crate) fn get_lp_mem_begin_and_len() -> (usize, usize);
 }
 
 #[cfg(feature = "esp32c6")]
@@ -66,14 +70,15 @@ const LP_ADDRESS_LEN : usize = 0x0004_0000;
 #[cfg(feature = "esp32c6")]
 const LP_ADDRESS_BASE : usize = 0x5000_0000;
 
-#[cfg(feature = "nottest")]
+#[cfg(all(feature = "nottest", any(feature = "esp32c6"), not(feature = "custom_range")))]
 pub(crate) fn get_lp_mem_begin_and_len() -> (usize, usize) {
     (LP_ADDRESS_BASE, LP_ADDRESS_LEN)
 }
 
 pub fn in_lp_mem_range<T>(addr : * const T) -> bool {
     let addr = addr as * const () as usize;
-    let (base, len) = get_lp_mem_begin_and_len();
+    #[warn(unused_unsafe)]
+    let (base, len) = unsafe { get_lp_mem_begin_and_len() };
     addr.wrapping_sub(base) < len
 }
 
@@ -88,7 +93,6 @@ thread_local! {
 pub fn lp_allocator_init() {
     GLOBAL_LP_ALLOCATOR.with_borrow_mut(|a| a.init());
 }
-
 
 #[cfg(not(feature = "nottest"))]
 pub(crate) fn lp_allocator_alloc(layout: Layout) -> * mut u8 {
