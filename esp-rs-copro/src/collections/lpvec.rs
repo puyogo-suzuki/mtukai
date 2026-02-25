@@ -13,19 +13,23 @@ use std::{alloc, boxed::Box};
 
 type Cap = core::num::niche_types::UsizeNoHighBit;
 
-/// A contiguous growable array type, written as `LPVec<T>`.
-/// This is similar to `Vec<T>`, but with a few differences:
+/// A contiguous growable array type, written as [`LPVec<T>`].
+/// This is similar to [`Vec<T>`], but with a few differences:
 /// - It can be allocated in LP memory, and thus can be used in the coprocessor.
-/// - Most of `Vec<T>` methods are implemented, but some of them are not implemented.
+/// - Most of [`Vec<T>`] methods are implemented, but some of them are not implemented.
 /// 
-/// The implementation is based on the one of `Vec<T>` in Rust's standard library, but with some modifications to make it work in LP memory and to support `MovableObject`.
-/// The memory layout of `LPVec<T>` is the same as `Vec<T>`, which means that it can be safely transmuted to `Vec<T>` and vice versa, as long as the pointer is valid and the length and capacity are correct.
-/// However, the memory management of `LPVec<T>` is different from `Vec<T>`, and thus it should not be used with `Vec<T>` methods that assume a certain memory management strategy.
-/// **caution**: `drop`ping `Vec<T>` allocated by `LPVec<T>` is undefined behavior.
+/// The implementation is based on the one of [`Vec<T>`] in Rust's standard library, but with some modifications to make it work in LP memory and to support [`MovableObject`].
+/// The memory layout of [`LPVec<T>`] is the same as [`Vec<T>`], which means that it can be safely transmuted to [`Vec<T>`] and vice versa, as long as the pointer is valid and the length and capacity are correct.
+/// However, the memory management of [`LPVec<T>`] is different from [`Vec<T>`], and thus it should not be used with [`Vec<T>`] methods that assume a certain memory management strategy.
 /// 
-/// The most of implementation comes from `Vec` in Rust's standard library, licensed under Apache License 2.0 or MIT License.
+/// **caution**: [`drop`]ping [`Vec<T>`] allocated by [`LPVec<T>`] is undefined behavior.
+/// 
+/// For `T` implementing [`Copy`] trait, [`LPVecCopy<T>`][crate::collections::lpveccopy::LPVecCopy<T>] is provided as a wrapper around `LPVec<LPAdapter<T>>`.
+/// [`LPVecCopy<T>`][crate::collections::lpveccopy::LPVecCopy<T>] allows directly to take and return `T`, instead of [`LPAdapter<T>`].
+/// 
+/// The most of implementation comes from [`Vec`] in Rust's standard library, licensed under Apache License 2.0 or MIT License.
 /// Copyright (c) The Rust Project Contributors.
-/// https://github.com/rust-lang/rust
+/// <https://github.com/rust-lang/rust>
 pub struct LPVec<T : MovableObject> {
     vec_inner : LPVecInner,
     len : usize,

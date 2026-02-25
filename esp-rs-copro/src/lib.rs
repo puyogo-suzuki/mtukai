@@ -23,6 +23,8 @@ pub mod lpadapter;
 pub mod movableobject;
 pub mod movableobjectwrapper;
 pub mod io;
+/// This module provides popular collection types.
+/// Currently, it includes [`LPVec<T>`][crate::collections::lpvec::LPVec] and [`LPVecCopy<T>`][crate::collections::lpveccopy::LPVecCopy].
 pub mod collections;
 pub mod prelude;
 #[cfg(not(feature = "is-lp-core"))]

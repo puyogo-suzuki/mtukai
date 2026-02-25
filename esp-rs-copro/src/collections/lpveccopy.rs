@@ -11,8 +11,15 @@ use ::alloc::{boxed::Box, vec::Vec};
 #[cfg(not(feature = "nottest"))]
 use std::{boxed::Box};
 
-type Cap = core::num::niche_types::UsizeNoHighBit;
-
+/// A contiguous growable array type, written as [`LPVecCopy<T>`].
+/// This is similar to [`LPVec<T>`], but `T` must implement [`Copy`], instead of [`MovableObject`].
+/// To use [`LPVec`] with `T` implementing [`MovableObject`], use [`LPVec<T>`].
+/// 
+/// See more detail about the difference between [`LPVecCopy<T>`] and [`LPVec<T>`] in the documentation of [`LPVec<T>`].
+/// 
+/// The most of implementation comes from [`Vec`] in Rust's standard library, licensed under Apache License 2.0 or MIT License.
+/// Copyright (c) The Rust Project Contributors.
+/// <https://github.com/rust-lang/rust>
 pub struct LPVecCopy<T : Copy> {
     vec_inner : LPVec<LPAdapter<T>>,
 }
