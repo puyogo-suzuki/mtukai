@@ -18,6 +18,7 @@ rand = "0.10.0"
 [features]
 default = []
 nottest = []
+unsafe-vtable = []
 is-lp-core = ["dep:esp-lp-hal", "nottest"]
 has-lp-core = ["dep:esp-println", "dep:esp-hal", "nottest"]
 esp32c6 = ["esp-lp-hal?/esp32c6", "esp-hal?/esp32c6", "esp-println?/esp32c6"]

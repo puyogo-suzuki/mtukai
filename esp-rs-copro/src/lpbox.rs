@@ -164,6 +164,7 @@ impl<T: MovableObject> LPBox<T> {
     pub fn new(value: T) -> Self { unsafe {
         let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
         ptr.write(value);
+        #[cfg(feature = "unsafe-vtable")]
         lpalloc::write_vtable(ptr as * mut u8, get_vtable(ptr.as_ref().unwrap()) as * mut u8);
         LPBox(NonNull::new_unchecked(ptr))
     }}

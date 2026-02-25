@@ -56,6 +56,7 @@ impl BlockHeader {
 }
 
 /// Write virtual table pointer to the block header of the given pointer.
+#[cfg(feature = "unsafe-vtable")]
 pub unsafe fn write_vtable(ptr: * mut u8, vtable: * mut u8) {
     let header = (ptr as usize - core::mem::size_of::<BlockHeader>()) as * mut BlockHeader;
     unsafe {
@@ -148,7 +149,7 @@ unsafe impl<const SIZE : usize> GlobalAlloc for ImplLPAllocator<SIZE> {
                 if remaining > core::mem::size_of::<BlockHeader>() + core::mem::size_of::<FreeBlock>() {
                     // Split the block
                     let new_block = (current as usize + total_size) as * mut BlockHeader;
-                    BlockHeader::init_header_value(new_block, remaining, null_mut(), current, (*current).next);
+                    BlockHeader::init_header_value(new_block, remaining, 1 as * mut u8, current, (*current).next);
                     if !(*current).next.is_null() {
                         (*(*current).next).prev = new_block;
                     }
