@@ -1,11 +1,15 @@
 use core::{alloc::{GlobalAlloc, Layout}, cell::UnsafeCell, mem::MaybeUninit, ptr::null_mut};
 
+/// An LP allocator implementation using a simple linked list of free blocks.
+/// This is used for the LP coprocessor to support dynamic memory allocation.
+/// Beacuse we must share information about allocation, this allocator is implemented as a struct, and the global allocator functions are just wrappers around it.
 pub struct ImplLPAllocator<const SIZE : usize> {
     pub free_ptr: UnsafeCell<*mut BlockHeader>,
     pub heap : [MaybeUninit<u8>; SIZE]
 }
 
 impl<const SIZE : usize> ImplLPAllocator<SIZE> {
+    /// Creates a new instance of the allocator. Note that the allocator is not initialized yet, and you must call [`init`] before using it.
     pub const fn new() -> Self {
         ImplLPAllocator {
             free_ptr: UnsafeCell::new(null_mut()),
@@ -14,6 +18,8 @@ impl<const SIZE : usize> ImplLPAllocator<SIZE> {
     }
 }
 impl<const SIZE : usize> ImplLPAllocator<SIZE> {
+    /// Initializes the allocator. This function must be called before using the allocator.
+    /// This function sets up the initial free block that covers the entire heap.
     pub fn init(&mut self) { unsafe{
         let head = self.heap.as_mut_ptr() as *mut BlockHeader;
         *(self.free_ptr.get_mut()) = head;
@@ -22,17 +28,25 @@ impl<const SIZE : usize> ImplLPAllocator<SIZE> {
         (*fb).next = null_mut();
     }}
 }
+
+/// This represents a header of a memory block.
 pub struct BlockHeader {
+    /// The next block header.
     next: * mut BlockHeader,
+    /// The virtual table pointer.
     vtable: * mut u8,
+    /// The previous block header.
     prev: * mut BlockHeader,
-    size: usize, // whole size including this header.
+    /// Whole size including this header.
+    size: usize,
 }
 
 impl BlockHeader {
+    /// Get the start address of the value stored in this block.
     unsafe fn get_value<T>(this : *mut Self) -> * mut T {
         (this as * const BlockHeader as usize + core::mem::size_of::<BlockHeader>()) as * mut T
     }
+    /// Initialize the header value. This function is used to set up the header of a memory block.
     const unsafe fn init_header_value(this : *mut Self, size : usize, vtable : *mut u8, prev : * mut BlockHeader, next : * mut BlockHeader) { unsafe {
         (*this).size = size;
         (*this).vtable = vtable;
@@ -41,6 +55,7 @@ impl BlockHeader {
     }}
 }
 
+/// Write virtual table pointer to the block header of the given pointer.
 pub unsafe fn write_vtable(ptr: * mut u8, vtable: * mut u8) {
     let header = (ptr as usize - core::mem::size_of::<BlockHeader>()) as * mut BlockHeader;
     unsafe {
@@ -48,7 +63,12 @@ pub unsafe fn write_vtable(ptr: * mut u8, vtable: * mut u8) {
     }
 }
 
-struct FreeBlock { next: * mut BlockHeader }
+/// This represents a free block.
+/// It is stored after [`BlockHeader`] of a free block.
+struct FreeBlock {
+    /// The next free block header.
+    next: * mut BlockHeader
+}
 
 #[cfg(feature = "has-lp-core")]
 unsafe extern "Rust" {
@@ -75,6 +95,7 @@ pub(crate) fn get_lp_mem_begin_and_len() -> (usize, usize) {
     (LP_ADDRESS_BASE, LP_ADDRESS_LEN)
 }
 
+/// Check whether the given address is in the LP memory range.
 pub fn in_lp_mem_range<T>(addr : * const T) -> bool {
     let addr = addr as * const () as usize;
     #[warn(unused_unsafe)]
@@ -87,6 +108,7 @@ use std::cell::RefCell;
 
 #[cfg(not(feature = "nottest"))]
 thread_local! {
+    /// This is a simulator of the global allocator for the LP coprocessor. It is used for testing purposes when the actual LP coprocessor is not available.
     static GLOBAL_LP_ALLOCATOR : RefCell<ImplLPAllocator<4096>> = RefCell::new(ImplLPAllocator::new());
 }
 #[cfg(not(feature = "nottest"))]

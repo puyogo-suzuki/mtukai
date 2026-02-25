@@ -17,6 +17,7 @@
 #![feature(cfg_target_has_atomic)]
 #[cfg(feature = "nottest")]
 extern crate alloc;
+/// This module provides functions and types related to memory allocation in the LP coprocessor. It includes a custom allocator implementation, as well as functions for checking whether an address is in the LP memory range.
 pub mod lpalloc;
 pub mod lpbox;
 /// This module provides an adapter, which automatically implements [`MovableObject`][crate::movableobject::MovableObject] for types that implement [`Copy`].
