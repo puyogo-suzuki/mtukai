@@ -13,6 +13,19 @@ use std::{alloc, boxed::Box};
 
 type Cap = core::num::niche_types::UsizeNoHighBit;
 
+/// A contiguous growable array type, written as `LPVec<T>`.
+/// This is similar to `Vec<T>`, but with a few differences:
+/// - It can be allocated in LP memory, and thus can be used in the coprocessor.
+/// - Most of `Vec<T>` methods are implemented, but some of them are not implemented.
+/// 
+/// The implementation is based on the one of `Vec<T>` in Rust's standard library, but with some modifications to make it work in LP memory and to support `MovableObject`.
+/// The memory layout of `LPVec<T>` is the same as `Vec<T>`, which means that it can be safely transmuted to `Vec<T>` and vice versa, as long as the pointer is valid and the length and capacity are correct.
+/// However, the memory management of `LPVec<T>` is different from `Vec<T>`, and thus it should not be used with `Vec<T>` methods that assume a certain memory management strategy.
+/// **caution**: `drop`ping `Vec<T>` allocated by `LPVec<T>` is undefined behavior.
+/// 
+/// The most of implementation comes from `Vec` in Rust's standard library, licensed under Apache License 2.0 or MIT License.
+/// Copyright (c) The Rust Project Contributors.
+/// https://github.com/rust-lang/rust
 pub struct LPVec<T : MovableObject> {
     vec_inner : LPVecInner,
     len : usize,
@@ -123,6 +136,7 @@ impl LPVecInner {
 }
 
 impl<T : MovableObject> LPVec<T> {
+    /// Creates a new, empty `LPVec<T>`.
     #[inline]
     pub const fn new() -> Self {
         LPVec {
@@ -132,6 +146,7 @@ impl<T : MovableObject> LPVec<T> {
         }
     }
 
+    /// Creates a new `LPVec<T>` with the specified capacity.
     pub fn try_with_capacity(capacity : usize) -> Option<Self> {
         let vec_inner = LPVecInner::try_with_capacity(capacity, T::LAYOUT)?;
         Some(LPVec {
@@ -141,6 +156,11 @@ impl<T : MovableObject> LPVec<T> {
         })
     }
 
+    /// Creates a new `LPVec<T>` with the specified pointer, length and capacity.
+    /// # Safety
+    /// The length of `ptr` must be at least `capacity`, and the memory must be valid for writes.
+    /// `length` must be less than or equal to `capacity`.
+    /// The caller must ensure that the memory is not accessed through any other pointer for the duration of the `LPVec<T>`.
     #[inline]
     pub const unsafe fn from_raw_parts(ptr : * mut T, len : usize, capacity : usize) -> Self {
         LPVec {
@@ -150,40 +170,55 @@ impl<T : MovableObject> LPVec<T> {
         }
     }
 
+    /// Creates a new `LPVec<T>` with the specified pointer, length and capacity.
+    /// # Safety
+    /// The length of `ptr` must be at least `capacity`, and the memory must be valid for writes.
+    /// `length` must be less than or equal to `capacity`.
+    /// The caller must ensure that the memory is not accessed through any other pointer for the duration of the `LPVec<T>`.
     #[inline]
     pub unsafe fn from_parts(ptr : NonNull<T>, len : usize, capacity : usize) -> Self {
         unsafe { Self::from_raw_parts(ptr.as_ptr(), len, capacity) }
     }
 
+    /// Decomposes the `LPVec<T>` into its raw parts: a pointer, a length and a capacity.
+    /// The return value are the same arguments in the same order as the arguments to `from_raw_parts`.
+    /// After calling this function, the caller is responsible for the memory previously managed by the `LPVec`.
     #[must_use = "losing the pointer will leak memory"]
     pub fn into_raw_parts(self) -> (*mut T, usize, usize) {
         let mut me = ManuallyDrop::new(self);
         (me.as_mut_ptr(), me.len(), me.capacity())
     }
+    /// Decomposes the `LPVec<T>` into its raw parts: a pointer, a length and a capacity.
+    /// The return value are the same arguments in the same order as the arguments to `from_parts`.
+    /// After calling this function, the caller is responsible for the memory previously managed by the `LPVec`.
     #[must_use = "losing the pointer will leak memory"]
     pub fn into_parts(self) -> (NonNull<T>, usize, usize) {
         let (ptr, len, capacity) = self.into_raw_parts();
         (unsafe { NonNull::new_unchecked(ptr) }, len, capacity)
     }
 
+    /// Returns a mutable pointer to the underlying buffer of the `LPVec<T>`.
+    /// This is the same pointer as the first argument of the tuple returned by `into_raw_parts`.
     #[rustc_never_returns_null_ptr]
     #[rustc_as_ptr]
     #[inline]
     pub const fn as_mut_ptr(&mut self) -> *mut T {
         unsafe { self.vec_inner.as_mut_ptr() as * mut T }
     }
+    /// Returns a const pointer to the underlying buffer of the `LPVec<T>`.
+    /// This is the same pointer as the first argument of the tuple returned by `into_raw_parts`.
     #[rustc_never_returns_null_ptr]
     #[rustc_as_ptr]
     #[inline]
     pub const fn as_ptr(&self) -> *const T {
         unsafe { self.vec_inner.as_ptr() as * const T }
     }
-
+    /// Returns the capacity of the underlying buffer of the `LPVec<T>`.
     #[inline]
     pub const fn capacity(&self) -> usize {
         if T::IS_ZST { usize::MAX } else { self.vec_inner.capacity() }
     }
-
+    
     #[inline]
     const fn needs_to_grow(&self, additional : usize) -> bool {
         self.len() + additional > self.capacity()
