@@ -23,7 +23,9 @@ pub mod lpalloc;
 pub mod lpbox;
 /// This module provides an adapter, which automatically implements [`MovableObject`][crate::movableobject::MovableObject] for types that implement [`Copy`].
 pub mod lpadapter;
+/// This module provides a trait, [`MovableObject`][crate::movableobject::MovableObject], for types that can be moved between the main and the LP coprocessors.
 pub mod movableobject;
+#[doc(hidden)]
 pub mod movableobjectwrapper;
 /// This module provides I/O drivers that can be transferred between the main and the LP coprocessors.
 pub mod io;
@@ -37,16 +39,27 @@ mod addresstranslation;
 #[macro_use]
 extern crate esp_println;
 
+/// This represents an error that can occur during the transfer of a value between the main and the LP coprocessors.
 #[derive(Debug, Hash, Clone, Copy, Eq, PartialEq)]
 pub enum EspCoproError {
+    /// The transfer is not allowed. This can occur when you try to transfer on the LP coprocessor.
     NotAllowed,
+    /// Something wrong. This is bug of this library.
     IncorrectlyTransferred,
+    /// Out of memory. This can occur when the LP memory is out of memory.
     OutOfMemory,
+    /// The LP coprocessor is in use. Have you started the LP coprocessor on the different thread?
     InUse
 }
-#[cfg(target_has_atomic_load_store = "8")]
-pub static ESP_COPRO_MUTEX : core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 
+/// This is for internal-use.
+/// This is used to prevent multiple threads from running the LP coprocessor at the same time.
+#[cfg(target_has_atomic_load_store = "8")]
+static ESP_COPRO_MUTEX : core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+
+/// This is for internal-use.
+/// Try to acquire the lock for the LP coprocessor. If the lock is already acquired, return an error.
+/// If the MCU does not support atomic operations, this function always succeeds.
 pub fn try_copro_lock() -> Result<(), EspCoproError> {
     #[cfg(target_has_atomic_load_store = "8")]
     if let Err(_) = ESP_COPRO_MUTEX.compare_exchange(false, true, core::sync::atomic::Ordering::Relaxed, core::sync::atomic::Ordering::Relaxed) {
@@ -55,6 +68,9 @@ pub fn try_copro_lock() -> Result<(), EspCoproError> {
     Ok(())
 }
 
+/// This is for internal-use.
+/// Release the lock for the LP coprocessor. This should be called after you finish using the LP coprocessor.
+/// If the MCU does not support atomic operations, this function does nothing.
 pub fn copro_unlock() {
     #[cfg(target_has_atomic_load_store = "8")]
     ESP_COPRO_MUTEX.store(false, core::sync::atomic::Ordering::Relaxed);
@@ -75,10 +91,18 @@ impl core::fmt::Display for EspCoproError {
 pub mod transfer_functions {
     use crate::{lpbox::{LPBox, cleanup, remove_by_main}, movableobject::MovableObject};
     use crate::EspCoproError;
+    /// This is used in esp-rs-copro-procmacro.
+    /// Transfers a value from the main coprocessor to the LP coprocessor.
+    /// The value is moved, and the ownership is transferred to the LP coprocessor.
+    /// The caller must ensure that the value is not used on the main coprocessor after this function is called.
     pub fn transfer_to_lp<T : MovableObject>(src : &T) -> Result<*mut u8, EspCoproError> {
         LPBox::<T>::write_to_lp(src)
     }
 
+    /// This is used in esp-rs-copro-procmacro.
+    /// Transfers a value from the LP coprocessor to the main coprocessor.
+    /// The value is moved, and the ownership is transferred to the main coprocessor.
+    /// The caller must ensure that the value is not used on the LP coprocessor after this function is called.
     pub unsafe fn transfer_to_main<T : MovableObject>(src : * const u8, dst : &mut T) -> Result<(), EspCoproError> {
         if let Some(v) = unsafe{(src as * const T).as_ref()} {
             unsafe{v.move_to_main(dst as * mut T as * mut u8)?;}

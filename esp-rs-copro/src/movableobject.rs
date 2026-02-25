@@ -1,8 +1,16 @@
 use core::{intrinsics::copy_nonoverlapping, mem::MaybeUninit};
 use crate::EspCoproError;
 
+/// A trait for objects that can be moved between the main memory and the LP memory.
+/// This is used for types that are stored in [`LPBox<T>`][crate::lpbox::LPBox], as well as for arrays and options of such types.
 pub trait MovableObject {
+    /// This is internal-use. This copies self to the main memory.
+    /// This function writes the value to the given destination address, which must be valid for writes and properly aligned for the type.
+    /// The caller is responsible for ensuring that the value is not used after being moved, and that the destination memory is not accessed by other means while the value is being moved.
     unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), EspCoproError>;
+    /// This is internal-use. This copies self to the LP memory.
+    /// This function writes the value to the given destination address, which must be valid for writes and properly aligned for the type.
+    /// The caller is responsible for ensuring that the value is not used after being moved, and that the destination memory is not accessed by other means while the value is being moved.
     unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), EspCoproError>;
 }
 
