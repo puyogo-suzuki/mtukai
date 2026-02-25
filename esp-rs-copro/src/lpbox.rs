@@ -10,6 +10,13 @@ use core::cmp::Ordering;
 #[cfg(not(feature = "nottest"))]
 use std::{alloc, boxed::Box, cmp::Ordering};
 
+/// A smart pointer type for heap allocation on the LP coprocessor.
+/// It provides similar functionality to [`Box<T>`], but is designed to work with the LP memory.
+/// `T` must implement the [`MovableObject`] trait, allowing it to be moved between the main processor and the LP coprocessor.
+/// [`LPBox<T>`] points both of memories. The current implementation points only the LP memory on the LP coprocessor.
+/// 
+/// **caution**: `drop`ing [`Box<T>`] allocated by [`LPBox<T>`] is undefined behavior.
+/// Always convert it back to [`LPBox<T>`] before dropping, or use `into_raw` and `from_raw` to manage the memory manually.
 pub struct LPBox<T: ?Sized + MovableObject>(pub(crate) NonNull<T>);
 
 impl<T: MovableObject> Debug for LPBox<T> {
@@ -18,6 +25,7 @@ impl<T: MovableObject> Debug for LPBox<T> {
     }
 }
 
+/// Get the [`MovableObject`] virtual table of this object.
 #[cfg(feature = "unsafe-vtable")]
 fn get_vtable(obj: &dyn MovableObject) -> *const u8 {
     let fat_ptr_addr = obj as *const dyn MovableObject as *const [usize; 2];
@@ -154,6 +162,9 @@ impl<T: MovableObject, const N : usize> LPBox<[T;N]> {
 }
 
 impl<T: MovableObject> LPBox<T> {
+    /// Create a new [`LPBox`] containing the given value.
+    /// The value is allocated on the main memory on the main processor, and is allocated on the LP memory on the LP coprocessor.
+    /// The ownership is transferred to the caller.
     #[cfg(not(feature = "is-lp-core"))]
     pub fn new(value: T) -> Self { unsafe {
         let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
@@ -161,6 +172,9 @@ impl<T: MovableObject> LPBox<T> {
         LPBox(NonNull::new_unchecked(ptr))
     }}
 
+    /// Create a new [`LPBox`] containing the given value.
+    /// The value is allocated on the main memory on the main processor, and is allocated on the LP memory on the LP coprocessor.
+    /// The ownership is transferred to the caller.
     #[cfg(feature = "is-lp-core")]
     pub fn new(value: T) -> Self { unsafe {
         let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
@@ -170,6 +184,7 @@ impl<T: MovableObject> LPBox<T> {
         LPBox(NonNull::new_unchecked(ptr))
     }}
 
+    /// This is for testing. It creates a new [`LPBox`] containing the given value on the simulated LP heap.
     #[cfg(not(feature = "nottest"))]
     pub unsafe fn new_lp(value: T) -> Self {
         unsafe {
@@ -187,25 +202,41 @@ impl<T: MovableObject + Copy> LPBox<T> {
 }
 
 impl<T: ?Sized + MovableObject> LPBox<T> {
+    /// Convert a [`Box`] into an [`LPBox`]. The value is not moved.
     pub fn from_box(value : Box<T>) -> Self{
         unsafe { LPBox(NonNull::new_unchecked(Box::into_raw(value))) }
     }
+
+    /// Convert an [`LPBox`] into a [`Box`]. The value is not moved.
     pub fn from_raw(raw : * mut T) -> Self {
         unsafe { LPBox(NonNull::new_unchecked(raw)) }
     }
 
+    /// Convert an [`LPBox`] into a raw pointer. The value is not moved, and the caller takes ownership of the memory.
     pub fn into_raw(self) -> * mut T {
         let b = mem::ManuallyDrop::new(self);
         b.0.as_ptr()
     }
 
+    /// Get a raw pointer to the value.
+    /// The value is not moved.
+    /// The ownership is not transferred, and the caller must ensure that the value is not dropped while using the pointer.
     pub fn as_ptr(&self) -> * const T {
         self.0.as_ptr() as * const T
     }
+
+    /// Get a mutable raw pointer to the value.
+    /// The value is not moved.
+    /// The ownership is not transferred, and the caller must ensure that the value is not dropped while using the pointer.
     pub fn as_mut_ptr(&mut self) -> * mut T {
         self.0.as_ptr()
     }
 
+    /// This is for internal-use.
+    /// Returns a reference to the value. The value is moved to the LP memory.
+    /// If the value is already in the LP memory, it is not moved again.
+    /// 
+    /// TODO: Must be moved to the other implementation. This is because Box<T> is single-owner, thus it is not possible that the pointee has already moved.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub(crate) fn write_to_lp(value : &T) -> Result<* mut u8, EspCoproError> { unsafe {
         if let Some(existing_lp_addr) = 
@@ -222,6 +253,9 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
         Ok(ptr)
     }}
 
+    /// This is for internal-use.
+    /// Returns a reference to the value. The value is moved to the main memory.
+    /// If the value is already in the main memory, the value on the main memory is overwritten.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     fn write_to_main(value : &T) -> Result<* mut u8, EspCoproError> { unsafe {
         let addr =

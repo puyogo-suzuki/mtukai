@@ -9,7 +9,7 @@ pub struct ImplLPAllocator<const SIZE : usize> {
 }
 
 impl<const SIZE : usize> ImplLPAllocator<SIZE> {
-    /// Creates a new instance of the allocator. Note that the allocator is not initialized yet, and you must call [`init`] before using it.
+    /// Creates a new instance of the allocator. Note that the allocator is not initialized yet, and you must call `init` before using it.
     pub const fn new() -> Self {
         ImplLPAllocator {
             free_ptr: UnsafeCell::new(null_mut()),

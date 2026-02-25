@@ -19,12 +19,13 @@
 extern crate alloc;
 /// This module provides functions and types related to memory allocation in the LP coprocessor. It includes a custom allocator implementation, as well as functions for checking whether an address is in the LP memory range.
 pub mod lpalloc;
+/// This module provides a smart pointer type, [`LPBox<T>`][crate::lpbox::LPBox], which is similar to [`Box<T>`] but supports allocations on the LP memory and can be transferred between the main and the LP coprocessors.
 pub mod lpbox;
 /// This module provides an adapter, which automatically implements [`MovableObject`][crate::movableobject::MovableObject] for types that implement [`Copy`].
 pub mod lpadapter;
 pub mod movableobject;
 pub mod movableobjectwrapper;
-/// This module provides I/O drivers that can be transferred between the main and the LP processors.
+/// This module provides I/O drivers that can be transferred between the main and the LP coprocessors.
 pub mod io;
 /// This module provides popular collection types.
 /// Currently, it includes [`LPVec<T>`][crate::collections::lpvec::LPVec] and [`LPVecCopy<T>`][crate::collections::lpveccopy::LPVecCopy].
