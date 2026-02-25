@@ -19,6 +19,7 @@
 extern crate alloc;
 pub mod lpalloc;
 pub mod lpbox;
+/// This module provides an adapter, which automatically implements [`MovableObject`][crate::movableobject::MovableObject] for types that implement [`Copy`].
 pub mod lpadapter;
 pub mod movableobject;
 pub mod movableobjectwrapper;

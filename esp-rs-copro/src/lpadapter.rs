@@ -1,8 +1,8 @@
 use core::{ops::{Deref, DerefMut}, ptr, slice};
-
 use crate::movableobject::MovableObject;
 
-
+/// This struct is a wrapper around a type `T` that allows it to be transferred between the main and the LP processors without requiring any special handling.
+/// It is designed to be used with types that are [`Copy`], as it simply copies the inner value when transferring.
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, Default, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LPAdapter<T> where T : Copy {
@@ -10,11 +10,14 @@ pub struct LPAdapter<T> where T : Copy {
 }
 
 impl<T: Copy> LPAdapter<T> {
+    /// Creates a new [`LPAdapter`] wrapping the given value.
     pub fn new(inner: T) -> Self {
         Self { inner }
     }
 }
 
+/// This trait allows for converting between slices of `T` and slices of [`LPAdapter<T>`].
+/// This is safe because the memory layout of [`LPAdapter<T>`] is the same as `T`, and both types are [`Copy`].
 pub trait LPAdapterSliceConvert<T : Copy> {
     fn cast_lp_adapter(&self) -> &[LPAdapter<T>];
     fn cast_mut_lp_adapter(&mut self) -> &mut [LPAdapter<T>];
@@ -29,6 +32,8 @@ impl<T : Copy> LPAdapterSliceConvert<T> for [T] {
     }
 }
 
+/// This trait allows for converting between slices of `T` and slices of [`LPAdapter<T>`].
+/// This is safe because the memory layout of [`LPAdapter<T>`] is the same as `T`, and both types are [`Copy`].
 pub trait LPAdapterSliceConvertFrom<T : Copy> {
     fn cast_lp_adapter(&self) -> &[T];
     fn cast_mut_lp_adapter(&mut self) -> &mut [T];
