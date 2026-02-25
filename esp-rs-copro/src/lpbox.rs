@@ -18,6 +18,7 @@ impl<T: MovableObject> Debug for LPBox<T> {
     }
 }
 
+#[cfg(feature = "unsafe-vtable")]
 fn get_vtable(obj: &dyn MovableObject) -> *const u8 {
     let fat_ptr_addr = obj as *const dyn MovableObject as *const [usize; 2];
     unsafe{

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [package.metadata.docs.rs]
-all-features = true
+features = ["is-lp-core", "has-lp-core", "esp32c6"]
 
 [dependencies]
 esp-println = { version = "0.16.1", features = ["log-04"], optional = true }
