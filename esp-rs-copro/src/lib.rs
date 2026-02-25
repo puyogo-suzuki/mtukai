@@ -22,6 +22,7 @@ pub mod lpbox;
 pub mod lpadapter;
 pub mod movableobject;
 pub mod movableobjectwrapper;
+/// This module provides I/O drivers that can be transferred between the main and the LP processors.
 pub mod io;
 /// This module provides popular collection types.
 /// Currently, it includes [`LPVec<T>`][crate::collections::lpvec::LPVec] and [`LPVecCopy<T>`][crate::collections::lpveccopy::LPVecCopy].

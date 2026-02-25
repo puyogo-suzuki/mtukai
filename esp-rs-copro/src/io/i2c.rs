@@ -15,12 +15,19 @@ pub struct LPI2C {
 /// Possible errors that can occur during I2C operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LPI2CError {
+    /// The buffer size exceeds the FIFO limit of the I2C controller.
     ExceedingFifo,
+    /// The I2C controller did not receive an acknowledgment from the device.
     AckCheckFailed,
+    /// The I2C controller timed out while waiting for a response from the device.
     TimeOut,
+    /// The I2C controller lost arbitration while trying to access the bus.
     ArbitrationLost,
+    /// The I2C controller did not complete the execution of the command.
     ExecIncomplete,
+    /// The number of commands exceeds the limit of the I2C controller.
     CommandNrExceeded,
+    /// The I2C controller received an invalid response from the device.
     InvalidResponse,
 }
 
