@@ -2,6 +2,7 @@
 name = "esp-rs-copro"
 version = "0.1.0"
 edition = "2024"
+license = "Apache-2.0 OR MIT"
 
 [package.metadata.docs.rs]
 features = ["is-lp-core", "has-lp-core", "esp32c6"]
