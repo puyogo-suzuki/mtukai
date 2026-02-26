@@ -29,7 +29,7 @@ pub mod movableobject;
 pub mod movableobjectwrapper;
 /// This module provides I/O drivers that can be transferred between the main and the LP coprocessors.
 pub mod io;
-/// This module provides [LPVec<T>][crate::collections::lpvec::LPVec] for heap collections that work with the LP memory.
+/// This module provides [`LPVec<T>`][crate::collections::lpvec::LPVec] for heap collections that work with the LP memory.
 pub mod collections;
 pub mod prelude;
 #[cfg(not(feature = "is-lp-core"))]
