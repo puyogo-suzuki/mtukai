@@ -6,6 +6,9 @@ edition = "2024"
 [lib]
 proc-macro = true
 
+[package.metadata.docs.rs]
+features = ["is-lp-core", "has-lp-core", "esp32c6"]
+
 [dependencies]
 document-features = "0.2"
 object            = { version = "0.37", default-features = false, features = ["read_core", "elf"]}#, optional = true }

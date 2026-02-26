@@ -1,14 +1,38 @@
 // The following code is originally based on code from the esp-rs/esp-hal project,
 // licensed under the Apache License, Version 2.0 (the "License").
+
+//! This crate provides procedural macros for the `esp-rs-copro` crate.
+//! # Features
+//! ## For LP coprocessor's project: with `is-lp-core` feature
+//! - [`esp_rs_copro_statics`]: Defines the necessary static variables and functions to use the heap allocator from the main processor. You call this macro once.
+//! ## For main processor's project: with `has-lp-core` feature
+//! - [`define_lp_allocator`]: Defines the necessary static variables and functions to use the heap allocator on the LP coprocessor from the `esp-rs-copro` crate. You call this macro once. Moreover, it must be visible from [`load_lp_code2`].
+//! - [`load_lp_code2`]: Load code to be run on the LP/ULP core. This macro is similar to `esp-hal`'s, however it transfers the given value to the LP memory, and the main processor sleeps.
+//! ## For shared project
+//! - `MovableObject` derive macro. This macro can be used to automatically implement the `MovableObject` trait for a struct or enum, which defines how to move the value to and from the LP memory.
+
 #[allow(unused)]
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::LitInt;
-use syn::{Data, DeriveInput};
 
+/// This macro must be called in the LP coprocessor's project.
+/// It defines the necessary static variables and functions to use the heap allocator from the main processor.
+/// The argument is the size of the heap in bytes, and it defaults to 4096 if not provided.
+/// 
+/// ## Implementation
+/// ### `__COPRO_TRANSFER` : *mut u8
+/// The main processor writes the pointer to the transferred values and `get_transfer` function reads.
+/// ### `__COPRO_ALLOCATOR_{size}` : ImplLPAllocator<{size}>
+/// The implementation of the heap allocator.
+/// `load_lp_code2` checks for the presence of this symbol to determine whether the heap allocator is used, and if it is, it initializes it and performs the transfer before running the LP core code.
+/// ### `ALLOCATOR` : LPAllocator
+/// This is the global allocator, which uses the allocator implementation defined as `__COPRO_ALLOCATOR_{size}`.
+/// ### `get_transfer` function
+/// This function is used to get a reference to the transferred value (`__COPRO_TRANSFER`). It returns `None` if it is `null`.
 #[proc_macro]
+#[cfg(feature = "is-lp-core")]
 pub fn esp_rs_copro_statics(_attr: TokenStream) -> TokenStream {
-    use syn::{parse::Error, Ident};
+    use syn::{parse::Error, Ident, LitInt};
     use proc_macro::Span;
     use proc_macro2::Literal;
     use proc_macro_crate::{FoundCrate, crate_name};
@@ -52,7 +76,13 @@ pub fn esp_rs_copro_statics(_attr: TokenStream) -> TokenStream {
     expanded.into()
 }
 
-#[cfg(any(feature = "has-lp-core", feature = "has-ulp-core", test))]
+/// This macro must be called in the main processor's project.
+/// It defines the necessary static variables and functions to use the heap allocator on the LP memory from `esp-rs-copro` crate.
+/// ## Implementation
+/// This defines three functions: `__lpcoproc_allocator_alloc`, `__lpcoproc_allocator_dealloc`, and `__lpcoproc_allocator_get_lp_mem_begin_and_len`.
+/// They are called by `esp-rs-copro` crate when the `LPBox<T>` allocates on the LP memory to transfer.
+/// They calls each own function pointer, which are set to the actual allocation and deallocation functions in `load_lp_code2`.
+#[cfg(feature = "has-lp-core")]
 #[proc_macro]
 pub fn define_lp_allocator(_input: TokenStream) -> TokenStream {
     quote!{
@@ -77,13 +107,30 @@ pub fn define_lp_allocator(_input: TokenStream) -> TokenStream {
 }
 
 /// Load code to be run on the LP/ULP core.
-///
+/// This macro is similar to `esp-hal`'s, however it transfers the given value to the LP memory, and the main processor sleeps.
 /// ## Example
 /// ```rust, no_run
-/// let lp_core_code = load_lp_code!("path.elf");
-/// lp_core_code.run(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, lp_pin);
+/// let lp_core_code = load_lp_code2!("path.elf");
+/// lp_core_code.run_light_sleep(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, transfer_value);
 /// ```
-#[cfg(any(feature = "has-lp-core", feature = "has-ulp-core", test))]
+/// 
+/// ## Arguments
+/// You specify the path to the ELF file of the LP project, and optionally you can specify the start address of the code in the LP memory and the length of the code.
+/// - `lp_start` : The start address of the code in the LP memory. If not specified, it defaults to the start of the RTC Memory section.
+/// - `lp_length` : The length of the code. If not specified, it defaults to the size of the code. This is used to check if the code fits in the LP memory.
+/// 
+/// ## Implementation
+/// `run_light_sleep` function performs the following steps:
+/// 1. It tries to acquire the coprocessor lock. If it fails, it returns an error.
+/// 2. If the heap allocator is used, it initializes it and performs the transfer of the given value to the LP memory.
+/// 3. It runs the LP core code.
+/// 4. It puts the main processor to light sleep, waiting for the LP core to wake it up.
+/// 5. After waking up, it performs the transfer back of the value from the LP memory to the main processor if the heap allocator is used, and then it releases the coprocessor lock.
+/// 
+/// The transferred value must implement the `MovableObject` trait, which can be derived using the `#[derive(MovableObject)]` macro.
+/// This trait defines how to move the value to and from the LP memory.
+/// 
+#[cfg(feature = "has-lp-core")]
 #[proc_macro]
 pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     use std::{fs, path::Path};
@@ -389,14 +436,38 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     .into()
 }
 
+/// This macro can be used to automatically implement the `MovableObject` trait for a struct or enum, which defines how to move the value to and from the LP memory.
+/// ## Implementation
+/// ### Overview of structs
+/// This macro simply generates code below for each struct member.
+/// ```rust,no_run
+/// self.member.wrap_move_to_main( (&mut (*dest).member) as * mut _ as * mut u8)?;
+/// ```
+/// ### Overview of enums
+/// We cannot directly get the pointers of the members of the enum, so we need to use `MaybeUninit` to create uninitialized buffers for each member.
+/// Then, we call the `wrap_move_to_main` or `wrap_move_to_lp` function for each member to move the value to the buffer, and then we construct the enum using the buffers.
+/// ```rust,no_run
+/// let mut member_buf = core::mem::MaybeUninit::uninit();
+/// self.member.wrap_move_to_main( (&mut member_buf) as * mut _ as * mut u8)?;
+/// let member_buf = member_buf.assume_init()
+/// ```
+/// Finally, we reconstruct the enum using the constructor with the buffers.
+/// ```rust,no_run
+/// dest.write_volatile(Self {member: member_buf, ...});
+/// ```
+/// 
+/// ### Resolution of `move_to` methods
+/// Due to Rust's limitation, we cannot directly call the `move_to_main` or `move_to_lp` function of the member's type, so `esp-rs-copro` defines wrapper functions `wrap_move_to_main` and `wrap_move_to_lp`.
+/// `wrap` functions for `MovableObject` simply call the `move_to` functions.
+/// In addition, `wrap` functions for [`Copy`] types copies the value.
+/// Thus, we can transparently support members typed as [`Copy`], such as [`i32`], and so on.
 #[proc_macro_derive(MovableObject)]
 pub fn movable_object_derive(input: TokenStream) -> TokenStream {
-    use syn::{parse::Error, Ident};
+    use syn::{parse::Error, Ident, Data, punctuated::Punctuated};
     use proc_macro::Span;
     use proc_macro_crate::{FoundCrate, crate_name};
-    use syn::punctuated::Punctuated;
 
-    let input = syn::parse_macro_input!(input as DeriveInput);
+    let input = syn::parse_macro_input!(input as syn::DeriveInput);
     let esp_copro_crate = if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-rs-copro") {
         let ident = Ident::new(name, Span::call_site().into());
         quote!{#ident}
