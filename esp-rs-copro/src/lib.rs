@@ -1,3 +1,130 @@
+//! # A supporting library for ESP32 LP coprocessor in Rust
+//! ## Overview
+//! This crate provides utilities for working with the RISC-V LP coprocessor on ESP32 microcontrollers.
+//! It includes functions for memory allocation, smart pointers, and traits for movable objects that can be transferred between the main and the LP coprocessors **without unsafe**.
+//! The crate is designed to be used in no_std environments, and it provides a custom allocator for the LP memory.
+//! `esp-rs-copro-procmacro` provides essential macros for using this crate. Please use with `esp-rs-copro-procmacro`.
+//! 
+//! ## Supported Platforms
+//! Currently, it supports the following ESP32 microcontrollers:
+//! - ESP32-C6: Enable `esp32c6` feature.
+//! 
+//! ## Key Features
+//! ### An allocator for the LP coprocessor
+//! This allocator allows you to allocate memory on the LP coprocessor dynamically.
+//! It is designed for use in `no_std` environments. (We expect that running the std environment on the LP coprocessor without the main memory is extremely hard.)
+//! `esp-rs-copro-procmacro` cooperates with this allocator to seamlessly transfer values between the processors.
+//! 
+//! ### [`LPBox<T>`][crate::lpbox::LPBox]: A smart pointer for the LP coprocessor
+//! This is a smart pointer type that supports allocations on the LP memory and can be transferred between the main and the LP coprocessors.
+//! It provides similar functionality to [`Box<T>`], but it is designed to work with the LP coprocessor's memory and transfer semantics.
+//! In the current implementation, it must contain an address of the running processor, however it is designed for handling both addresses of the processors.
+//! 
+//! ### [`MovableObject`][crate::movableobject::MovableObject]: A trait for movable objects
+//! This trait defines the interface for types that can be moved between the main and the LP coprocessors.
+//! It includes methods for moving values to and from the main and LP coprocessors.
+//! This trait can be implemented using `esp-rs-copro-procmacro`.
+//! Due to Rust's limitations, each type contained in transferred objects (including nested fields) must implement this trait separately.
+//! 
+//! ### [`LPAdapter<T>`][crate::lpadapter::LPAdapter]: An adapter for [`Copy`] types, which implements [`MovableObject`][crate::movableobject::MovableObject]
+//! This adapter automatically implements the [`MovableObject`][crate::movableobject::MovableObject] trait for types that implement [`Copy`].
+//! This allows you to easily transfer simple data types between the main and the LP coprocessors without needing to manually implement the [`MovableObject`][crate::movableobject::MovableObject] trait for each type.
+//! 
+//! ## Examples
+//! ### Project Structure
+//! You must prepare three projects: one for the main coprocessor, one for the LP coprocessor, and one for shared code.
+//! Each project should include `esp-rs-copro` and `esp-rs-copro-procmacro` as dependencies.
+//! 
+//! ### Shared Code
+//! This project defines the structures for the shared values.
+//! Example: 
+//! ```rust
+//! #[derive(Clone, Copy, esp_rs_copro_procmacro::MovableObject)]
+//! pub struct TempAndHumid {
+//!     pub temperature : i32,
+//!     pub humidity : i32
+//! }
+//! impl TempAndHumid {
+//!     pub fn new(temperature : i32, humidity : i32) -> Self { TempAndHumid { temperature, humidity}}
+//! }
+//! #[derive(esp_rs_copro_procmacro::MovableObject)]
+//! pub struct MainLPParcel{
+//!     pub i2c : LPI2C,
+//!     pub measurement_count : usize,
+//!     pub result : LPVec<Option<TempAndHumid>>
+//! }
+//! ```
+//! 
+//! ### LP Project
+//! This project contains the code that runs on the LP coprocessor. It should include the shared code as a dependency:
+//! ```toml
+//! esp-rs-copro = { version = ..., features=["is-lp-core", "esp32c6"] }
+//! esp-rs-copro-procmacro = { version = ..., features=["is-lp-core"] }
+//! your_shared_project = ...
+//! ```
+//! You must also prepare `build.rs` and a linker script for linking. Please see the example project.
+//! 
+//! Toplevel example:
+//! ```rust
+//! #![no_std]
+//! #![no_main]
+//! esp_rs_copro_procmacro::esp_rs_copro_statics!(4096);
+//! #[alloc_error_handler]
+//! fn ignore_alloc_error(_: core::alloc::Layout) -> ! { loop{} }
+//! #[entry]
+//! fn main() -> !{
+//!   let v: &mut MainLPParcel = get_transfer::<MainLPParcel>().unwrap();
+//!   // ...
+//!   wake_hp_core();
+//!   lp_core_halt();
+//! }
+//! ```
+//! 
+//! First, you need to prepare the static variables for interacting with the main processor using `esp-rs-copro-procmacro::esp_rs_copro_statics!`.
+//! The argument is the size of the static variables in bytes.
+//! The processors share information about allocation with these static variables.
+//! 
+//! Second, you must define a main function like `esp-lp-hal`.
+//! It requires the `#[entry]` attribute, and it should never return.
+//! Inside the main function, you can get the transferred value from the main processor using `get_transfer::<T>()`, where `T` is the type of the transferred value.
+//! 
+//! ### Main Project
+//! This project contains the code that runs on the main coprocessor. It should include the shared code as a dependency:
+//! ```toml
+//! esp-rs-copro = { version = ..., features=["esp32c6", "has-lp-core"] }
+//! esp-rs-copro-procmacro = { version = ..., features=["esp32c6", "has-lp-core"] }
+//! your_shared_project = ...
+//! ```
+//! 
+//! Toplevel example:
+//! ```rust
+//! esp_rs_copro_procmacro::define_lp_allocator!();
+//! 
+//! fn foo(){
+//!   // load code to LP core
+//!   let lp_core_code = esp-rs-copro-procmacro::load_lp_code2!(
+//!     "../your_lp_project/target/riscv32imac-unknown-none-elf/release/esp-rs-copro-lp"
+//!   );
+//!   let mut parcel = MainLPParcel { ... };
+//!   if let Err(e) = lp_core_code.run_light_sleep(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut Rtc::new(peripherals.LPWR), &mut parcel) {
+//!     println!("Error running LP core: {:?}", e);
+//!   }
+//!   // read parcel value.
+//! }
+//! ```
+//! 
+//! First, you need to define the allocator for the LP coprocessor using `esp-rs-copro-procmacro::define_lp_allocator!()`.
+//! This is a singleton. You must call this macro only once in your project.
+//! 
+//! Second, you can load the code for the LP coprocessor using `esp-rs-copro-procmacro::load_lp_code2!()`, which is similar to `esp-hal`'s approach.
+//! The argument is the path to the compiled binary for the LP coprocessor.
+//! The returned code loader provides a `run_light_sleep()` method that takes the LP core, wakeup source, RTC, and the mutable reference to the value to be transferred.
+//! The transferred value will be moved to the LP coprocessor, where you can read it using `get_transfer::<T>()`.
+//! 
+//! **Limitation**: you must call `define_lp_allocator!()` and `load_lp_code2!()` in the same module.
+//! This is because `load_lp_code2!()` needs to access the static variable defined by `define_lp_allocator!()`.
+//! We are planning to remove this limitation in the future.
+
 #![cfg_attr(feature="nottest", no_std)]
 #![feature(layout_for_ptr)]
 #![feature(ptr_internals)]
