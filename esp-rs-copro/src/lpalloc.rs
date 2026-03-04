@@ -99,7 +99,7 @@ pub(crate) fn get_lp_mem_begin_and_len() -> (usize, usize) {
 /// Check whether the given address is in the LP memory range.
 pub fn in_lp_mem_range<T>(addr : * const T) -> bool {
     let addr = addr as * const () as usize;
-    #[warn(unused_unsafe)]
+    #[allow(unused_unsafe)]
     let (base, len) = unsafe { get_lp_mem_begin_and_len() };
     addr.wrapping_sub(base) < len
 }
