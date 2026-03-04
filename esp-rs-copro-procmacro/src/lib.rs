@@ -351,16 +351,15 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
             quote!{unsafe { transfer_to_main(((#a) as *mut *mut u8).read_volatile(), transfer_value) } })
         } else { (quote! {}, quote! {})};
     let allocsym = obj_file.symbols().find(|s| s.name().map_or(false, |v| v.starts_with("__COPRO_ALLOCATOR_")));
-    let (allocfun, lpalloc) = if let Some(a) = allocsym {
+    let allocfun = if let Some(a) = allocsym {
         let addr = a.address();
         let size = a.name().ok().and_then(|v| v["__COPRO_ALLOCATOR_".len()..].parse::<usize>().ok());
-        (quote!{
+        quote!{
             pub fn get_allocator() -> *mut ImplLPAllocator<#size> {
                 #addr as *mut ImplLPAllocator<#size>
             }
-        }, quote!{
-        })
-    } else {(quote!{}, quote!())};
+        }
+    } else {quote!{}};
     let alloccall = if !allocfun.is_empty() {quote!{
         let all = LpCoreCode::get_allocator();
         unsafe{all.as_mut().unwrap().init()};
@@ -407,8 +406,6 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
             unsafe {
                 core::ptr::copy_nonoverlapping(LP_CODE as *const _ as *const u8, #copy_dest, LP_CODE.len());
             }
-
-            #lpalloc
 
             impl LpCoreCode {
                 pub fn run_light_sleep<T : MovableObject>(
