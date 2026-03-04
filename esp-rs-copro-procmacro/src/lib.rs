@@ -348,7 +348,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                 let trans = transfer_to_lp(transfer_value)?;
                 unsafe {((#a) as *mut *mut u8).write_volatile(trans);}
             },
-            quote!{unsafe { transfer_to_main(((#a) as *mut *mut u8).read_volatile(), transfer_value) } })
+            quote!{unsafe { transfer_to_main(((#a) as *mut *mut u8).read_volatile(), transfer_value)? } })
         } else { (quote! {}, quote! {})};
     let allocsym = obj_file.symbols().find(|s| s.name().map_or(false, |v| v.starts_with("__COPRO_ALLOCATOR_")));
     let allocfun = if let Some(a) = allocsym {
