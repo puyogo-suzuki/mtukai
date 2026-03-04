@@ -420,9 +420,9 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                     #alloccall
                     lp_core.run(wakeup_source);
                     rtc.sleep_light(&[&WakeFromLpCoreWakeupSource::new()]);
-                    let ret = #transfer_back;
+                    #transfer_back;
                     copro_unlock();
-                    ret
+                    Ok(())
                 }
                 #allocfun
             }
