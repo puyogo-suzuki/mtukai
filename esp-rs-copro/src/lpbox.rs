@@ -213,6 +213,7 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     }
 
     /// Convert an [`LPBox`] into a raw pointer. The value is not moved, and the caller takes ownership of the memory.
+    #[must_use = "losing the pointer will leak memory"]
     pub fn into_raw(self) -> * mut T {
         let b = mem::ManuallyDrop::new(self);
         b.0.as_ptr()
@@ -266,10 +267,16 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
         Ok(addr as * mut u8)
     }}
 
+    /// This is for internal-use.
+    /// Returns a reference to the moved value. The value is moved to the LP memory.
+    /// If the value is already in the LP memory, it is not moved again.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub unsafe fn get_moved_to_lp(&self) -> Result<LPBox<T>, EspCoproError> {
         unsafe { Ok(LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_lp(self.0.as_ref())? as usize))) )}
     }
+    /// This is for internal-use.
+    /// Returns a reference to the moved value. The value is moved to the main memory.
+    /// If the value is already in the main memory, the value on the main memory is overwritten.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub unsafe fn get_moved_to_main(&self) -> Result<LPBox<T>, EspCoproError> {
         unsafe { Ok(LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_main(self.0.as_ref())? as usize))) )}
@@ -280,6 +287,12 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     // #[cfg(feature = "is-lp-core")]
     // pub fn get_moved_to_main(&self) -> LPBox<T> { todo!(); }
     
+}
+
+impl<T: MovableObject> LPBox<MaybeUninit<T>> {
+    pub unsafe fn assume_init(self) -> LPBox<T> {
+        LPBox::from_raw(LPBox::into_raw(self) as * mut T)
+    }
 }
 
 impl<T: ?Sized + MovableObject> MovableObject for LPBox<T> {
