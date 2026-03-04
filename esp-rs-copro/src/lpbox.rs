@@ -289,7 +289,7 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     
 }
 
-impl<T: MovableObject> LPBox<MaybeUninit<T>> {
+impl<T: MovableObject + Copy> LPBox<MaybeUninit<T>> {
     pub unsafe fn assume_init(self) -> LPBox<T> {
         LPBox::from_raw(LPBox::into_raw(self) as * mut T)
     }
