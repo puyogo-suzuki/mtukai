@@ -155,6 +155,7 @@ pub mod movableobject;
 #[doc(hidden)]
 pub mod movableobjectwrapper;
 /// This module provides I/O drivers that can be transferred between the main and the LP coprocessors.
+#[cfg(feature = "esp32c6")]
 pub mod io;
 /// This module provides [`LPVec<T>`][crate::collections::lpvec::LPVec] for heap collections that work with the LP memory.
 pub mod collections;
