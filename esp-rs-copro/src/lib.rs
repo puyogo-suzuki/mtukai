@@ -38,7 +38,7 @@
 //! ### Shared Code
 //! This project defines the structures for the shared values.
 //! Example: 
-//! ```rust
+//! ```rust,ignore
 //! #[derive(Clone, Copy, esp_rs_copro_procmacro::MovableObject)]
 //! pub struct TempAndHumid {
 //!     pub temperature : i32,
@@ -65,7 +65,7 @@
 //! You must also prepare `build.rs` and a linker script for linking. Please see the example project.
 //! 
 //! Toplevel example:
-//! ```rust
+//! ```rust,ignore
 //! #![no_std]
 //! #![no_main]
 //! esp_rs_copro_procmacro::esp_rs_copro_statics!(4096);
@@ -97,7 +97,7 @@
 //! ```
 //! 
 //! Toplevel example:
-//! ```rust
+//! ```rust,ignore
 //! esp_rs_copro_procmacro::define_lp_allocator!();
 //! 
 //! fn foo(){

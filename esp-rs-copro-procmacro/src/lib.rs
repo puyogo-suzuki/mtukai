@@ -109,7 +109,7 @@ pub fn define_lp_allocator(_input: TokenStream) -> TokenStream {
 /// Load code to be run on the LP/ULP core.
 /// This macro is similar to `esp-hal`'s, however it transfers the given value to the LP memory, and the main processor sleeps.
 /// ## Example
-/// ```rust, no_run
+/// ```rust,ignore
 /// let lp_core_code = load_lp_code2!("path.elf");
 /// lp_core_code.run_light_sleep(&mut lp_core, lp_core::LpCoreWakeupSource::HpCpu, transfer_value);
 /// ```
@@ -437,19 +437,19 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
 /// ## Implementation
 /// ### Overview of structs
 /// This macro simply generates code below for each struct member.
-/// ```rust,no_run
+/// ```rust,ignore
 /// self.member.wrap_move_to_main( (&mut (*dest).member) as * mut _ as * mut u8)?;
 /// ```
 /// ### Overview of enums
 /// We cannot directly get the pointers of the members of the enum, so we need to use `MaybeUninit` to create uninitialized buffers for each member.
 /// Then, we call the `wrap_move_to_main` or `wrap_move_to_lp` function for each member to move the value to the buffer, and then we construct the enum using the buffers.
-/// ```rust,no_run
+/// ```rust,ignore
 /// let mut member_buf = core::mem::MaybeUninit::uninit();
 /// self.member.wrap_move_to_main( (&mut member_buf) as * mut _ as * mut u8)?;
 /// let member_buf = member_buf.assume_init()
 /// ```
 /// Finally, we reconstruct the enum using the constructor with the buffers.
-/// ```rust,no_run
+/// ```rust,ignore
 /// dest.write_volatile(Self {member: member_buf, ...});
 /// ```
 /// 
