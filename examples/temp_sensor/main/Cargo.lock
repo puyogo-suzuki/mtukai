@@ -578,21 +578,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "esp-rs-copro-main"
-version = "0.1.0"
-dependencies = [
- "critical-section",
- "esp-alloc",
- "esp-backtrace",
- "esp-bootloader-esp-idf",
- "esp-hal",
- "esp-println",
- "esp-rs-copro",
- "esp-rs-copro-procmacro",
- "shared",
-]
-
-[[package]]
 name = "esp-rs-copro-procmacro"
 version = "0.1.0"
 dependencies = [
@@ -1123,14 +1108,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shared"
-version = "0.1.0"
-dependencies = [
- "esp-rs-copro",
- "esp-rs-copro-procmacro",
-]
-
-[[package]]
 name = "somni-expr"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1211,6 +1188,29 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "temp-sensor-main"
+version = "0.1.0"
+dependencies = [
+ "critical-section",
+ "esp-alloc",
+ "esp-backtrace",
+ "esp-bootloader-esp-idf",
+ "esp-hal",
+ "esp-println",
+ "esp-rs-copro",
+ "esp-rs-copro-procmacro",
+ "temp-sensor-shared",
+]
+
+[[package]]
+name = "temp-sensor-shared"
+version = "0.1.0"
+dependencies = [
+ "esp-rs-copro",
+ "esp-rs-copro-procmacro",
 ]
 
 [[package]]

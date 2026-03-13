@@ -16,7 +16,7 @@ use esp_hal::time::Rate;
 use esp_hal::delay::Delay;
 
 use esp_rs_copro::{io::i2c::LPI2C, collections::lpvec::LPVec};
-use shared::MainLPParcel;
+use temp_sensor_shared::MainLPParcel;
 
 use esp_hal::{
     gpio::lp_io::LowPowerOutput,
@@ -48,7 +48,7 @@ fn sht30_main() -> !{
     println!("lp core stopped");
     // load code to LP core
     let lp_core_code = load_lp_code2!(
-        "../lp/target/riscv32imac-unknown-none-elf/release/esp-rs-copro-lp"
+        "../lp/target/riscv32imac-unknown-none-elf/release/temp-sensor-lp"
     );
     {
         // let i2c = LpI2c::new(peripherals.LP_I2C0, 

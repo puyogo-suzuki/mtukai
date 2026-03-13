@@ -1,5 +1,5 @@
 [package]
-name = "esp-rs-copro-lp"
+name = "temp-sensor-lp"
 version = "0.1.0"
 edition = "2024"
 
@@ -13,6 +13,6 @@ panic-halt = "0.2.0"
 esp-rs-copro = { path = "../../../esp-rs-copro", features=["is-lp-core", "esp32c6"] }
 esp-rs-copro-procmacro = { path = "../../../esp-rs-copro-procmacro", features=["is-lp-core"] }
 
-shared = { path = "../shared" }
+temp-sensor-shared = { path = "../shared" }
 [profile.dev]
 opt-level = 's'

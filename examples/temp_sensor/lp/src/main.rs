@@ -5,7 +5,7 @@
 use embedded_hal::{delay::DelayNs, digital::OutputPin};
 use esp_lp_hal::{delay::Delay, gpio::Output, prelude::*, wake_hp_core};
 use esp_rs_copro::{io::i2c::{LPI2C, LPI2CError}, prelude::lp_core_halt};
-use shared::{MainLPParcel, TempAndHumid};
+use temp_sensor_shared::{MainLPParcel, TempAndHumid};
 use panic_halt as _;
 use core::mem::MaybeUninit;
 
