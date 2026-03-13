@@ -181,14 +181,16 @@ pub enum EspCoproError {
 
 /// This is for internal-use.
 /// This is used to prevent multiple threads from running the LP coprocessor at the same time.
-#[cfg(target_has_atomic_load_store = "8")]
+#[cfg(feature = "has-lp-core")]
+#[cfg(target_has_atomic = "8")]
 static ESP_COPRO_MUTEX : core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
 
 /// This is for internal-use.
 /// Try to acquire the lock for the LP coprocessor. If the lock is already acquired, return an error.
 /// If the MCU does not support atomic operations, this function always succeeds.
+#[cfg(feature = "has-lp-core")]
 pub fn try_copro_lock() -> Result<(), EspCoproError> {
-    #[cfg(target_has_atomic_load_store = "8")]
+    #[cfg(target_has_atomic = "8")]
     if let Err(_) = ESP_COPRO_MUTEX.compare_exchange(false, true, core::sync::atomic::Ordering::Relaxed, core::sync::atomic::Ordering::Relaxed) {
         return Err(EspCoproError::InUse);
     }
@@ -198,8 +200,9 @@ pub fn try_copro_lock() -> Result<(), EspCoproError> {
 /// This is for internal-use.
 /// Release the lock for the LP coprocessor. This should be called after you finish using the LP coprocessor.
 /// If the MCU does not support atomic operations, this function does nothing.
+#[cfg(feature = "has-lp-core")]
 pub fn copro_unlock() {
-    #[cfg(target_has_atomic_load_store = "8")]
+    #[cfg(target_has_atomic = "8")]
     ESP_COPRO_MUTEX.store(false, core::sync::atomic::Ordering::Relaxed);
 }
 
