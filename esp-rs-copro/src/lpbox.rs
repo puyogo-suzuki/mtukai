@@ -329,6 +329,12 @@ impl<T : ?Sized + MovableObject> DerefMut for LPBox<T> {
     }
 }
 
+impl<T: ?Sized + MovableObject> AsRef<T> for LPBox<T> {
+    fn as_ref(&self) -> &T {
+        self.deref()
+    }
+}
+
 impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     fn drop(&mut self) {
