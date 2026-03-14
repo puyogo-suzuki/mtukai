@@ -4,7 +4,7 @@
 /// https://github.com/rust-lang/rust
 
 use core::{alloc::Layout, slice, fmt, intrinsics, iter, marker::PhantomData, mem::{self, ManuallyDrop, MaybeUninit, SizedTypeProperties}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull, Unique}, slice::SliceIndex};
-use crate::{lpadapter::LPAdapter, lpbox::LPBox, movableobject::MovableObject, EspCoproError};
+use crate::{EspCoproError, lpadapter::LPAdapter, lpalloc::{address_translate_to_lp, address_translate_to_main}, lpbox::LPBox, movableobject::MovableObject};
 
 #[cfg(feature = "nottest")]
 use ::alloc::{alloc, boxed::Box, vec::Vec};
@@ -117,7 +117,7 @@ impl LPVecInner {
     fn deallocate(&mut self, elem_layout : Layout) {
         let layout = unsafe { self.current_memory(elem_layout) };
         if layout.size() == 0 { return; }
-        crate::lpbox::lp_dealloc(self.ptr.as_ptr(), layout);
+        crate::lpbox::lp_dealloc(address_translate_to_main(self.ptr.as_ptr()), layout);
     }
 
     const unsafe fn from_raw_parts(ptr : * mut u8, capacity : usize) -> Self {
@@ -127,10 +127,10 @@ impl LPVecInner {
         }
     }
     const unsafe fn as_mut_ptr(&mut self) -> * mut u8 {
-        self.ptr.as_ptr()
+        address_translate_to_main(self.ptr.as_ptr())
     }
     const unsafe fn as_ptr(&self) -> * const u8 {
-        self.ptr.as_ptr()
+        address_translate_to_main(self.ptr.as_ptr())
     }
 
     unsafe fn into_mut_ptr<T : MovableObject>(self) -> * mut T{
@@ -168,7 +168,7 @@ impl<T : MovableObject> LPVec<T> {
     #[inline]
     pub const unsafe fn from_raw_parts(ptr : * mut T, len : usize, capacity : usize) -> Self {
         LPVec {
-            vec_inner : unsafe { LPVecInner::from_raw_parts(ptr as * mut u8, if T::IS_ZST {0} else {capacity}) },
+            vec_inner : unsafe { LPVecInner::from_raw_parts(address_translate_to_lp(ptr) as * mut u8, if T::IS_ZST {0} else {capacity}) },
             len : len,
             _marker : PhantomData
         }
@@ -961,7 +961,7 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
         let dst_ptr = crate::lpbox::LPBox::<[T]>::write_to_lp(self.as_slice())?;
         unsafe {
             dest.write_volatile(LPVec {
-                vec_inner : LPVecInner::from_raw_parts(dst_ptr, self.capacity()),
+                vec_inner : LPVecInner::from_raw_parts(address_translate_to_lp(dst_ptr), self.capacity()),
                 len : self.len(),
                 _marker : PhantomData
             });

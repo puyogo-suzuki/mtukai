@@ -1,0 +1,28 @@
+[package]
+name = "list-sum-lp"
+version = "0.1.0"
+edition = "2024"
+features = ["esp32s3", "esp32c6"]
+
+[dependencies]
+esp-lp-hal = { version = "0.3.0" }
+
+embedded-hal      = { version = "1.0.0" }
+cfg-if = "1.0.3"
+panic-halt = "0.2.0"
+
+esp-rs-copro = { path = "../../../esp-rs-copro", features=["is-lp-core"] }
+esp-rs-copro-procmacro = { path = "../../../esp-rs-copro-procmacro", features=["is-lp-core"] }
+
+list-sum-shared = { path = "../shared" }
+
+[build-dependencies]
+esp-metadata-generated = { version = "0.3.0", features = ["build-script"] }
+
+[profile.dev]
+opt-level = 's'
+
+[features]
+esp32s3 = ["esp-rs-copro/esp32s3", "esp-lp-hal/esp32s3"]
+esp32c6 = ["esp-rs-copro/esp32c6", "esp-lp-hal/esp32c6"]
+
