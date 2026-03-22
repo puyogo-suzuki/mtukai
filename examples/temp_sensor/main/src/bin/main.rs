@@ -7,7 +7,6 @@
 )]
 
 use esp_alloc as _;
-use esp_hal::clock::CpuClock;
 use esp_hal::gpio::lp_io::LowPowerOutputOpenDrain;
 use esp_hal::i2c::lp_i2c::LpI2c;
 use esp_hal::peripherals::{LP_IO};
@@ -25,7 +24,7 @@ use esp_hal::{
 
 use esp_rs_copro_procmacro::{define_lp_allocator, load_lp_code2};
 
-use esp_println::{print, println};
+use esp_println::println;
 
 #[panic_handler]
 fn panic(_: &core::panic::PanicInfo) -> ! {
@@ -40,21 +39,16 @@ define_lp_allocator!();
 
 fn sht30_main() -> !{
     let peripherals = esp_hal::init(esp_hal::Config::default());
-    // configure GPIO 1 as LP output pin
-    let lp_pin = LowPowerOutput::new(peripherals.GPIO5);
 
     let mut lp_core = LpCore::new(peripherals.LP_CORE);
     lp_core.stop();
-    println!("lp core stopped");
     // load code to LP core
     let lp_core_code = load_lp_code2!(
         "../lp/target/riscv32imac-unknown-none-elf/release/temp-sensor-lp"
     );
     {
-        // let i2c = LpI2c::new(peripherals.LP_I2C0, 
-        //     LowPowerOutputOpenDrain::new(peripherals.GPIO6),
-        //     LowPowerOutputOpenDrain::new(peripherals.GPIO7),
-        //     Rate::from_khz(2));
+        let _gpio1 : LowPowerOutput<'_, 1> = LowPowerOutput::new(peripherals.GPIO1);
+        LP_IO::regs().out_data_w1ts().write(|w| unsafe { w.bits(1 << 1) });
         let gpio6 = LowPowerOutputOpenDrain::new(peripherals.GPIO6);
         let gpio7 = LowPowerOutputOpenDrain::new(peripherals.GPIO7);
         
@@ -71,12 +65,14 @@ fn sht30_main() -> !{
         let mut parcel = MainLPParcel {
             i2c : LPI2C::new(i2c),
             result : LPVec::new(),
-            measurement_count : 5
+            measurement_count : 30
         };
-        println!("lpcore run");
-        if let Err(e) = lp_core_code.run_light_sleep(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut Rtc::new(peripherals.LPWR), &mut parcel, lp_pin) {
+        LP_IO::regs().out_data_w1tc().write(|w| unsafe { w.bits(1 << 1) });
+
+        if let Err(e) = lp_core_code.run_light_sleep(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut Rtc::new(peripherals.LPWR), &mut parcel) {
             println!("Error running LP core: {}", e);
         }
+        LP_IO::regs().out_data_w1ts().write(|w| unsafe { w.bits(1 << 1) });
         for i in parcel.result.iter() {
             match i {
                 Some(i) => {
@@ -91,8 +87,9 @@ fn sht30_main() -> !{
     loop {}
 }
 
+#[allow(unused_variables)]
+#[allow(unused)]
 fn refresh_gpio() -> ! {
-    
     let peripherals = esp_hal::init(esp_hal::Config::default());
     // configure GPIO 1 as LP output pin
     let pin6: LowPowerOutput<'_, 6> = LowPowerOutput::new(peripherals.GPIO6);
@@ -110,13 +107,11 @@ fn refresh_gpio() -> ! {
         delay.delay_millis(500);
     }}
 }
+
 #[esp_hal::main]
 fn main() -> ! {
-    // generator version: 0.5.0
     esp_alloc::heap_allocator!(size: 72 * 1024);
     esp_println::logger::init_logger_from_env();
-    // let delay = Delay::new();
     sht30_main();
     // refresh_gpio();
-    // start LP core
 }

@@ -14,5 +14,15 @@ esp-rs-copro = { path = "../../../esp-rs-copro", features=["is-lp-core", "esp32c
 esp-rs-copro-procmacro = { path = "../../../esp-rs-copro-procmacro", features=["is-lp-core"] }
 
 temp-sensor-shared = { path = "../shared" }
+
 [profile.dev]
 opt-level = 's'
+
+[profile.release]
+codegen-units    = 1     # LLVM can perform better optimizations using a single thread
+debug            = 2
+debug-assertions = false
+incremental      = false
+lto              = 'fat'
+opt-level        = 's'
+overflow-checks  = false
