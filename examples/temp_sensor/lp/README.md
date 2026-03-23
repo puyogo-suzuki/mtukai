@@ -12,6 +12,6 @@ Licensed under either of:
 at your option.
 
 This project incorporates code from:
-- ESP-IDF
+- ESP-IDF ([GitHub Repository](https://github.com/espressif/esp-idf))
 
 which are also available under Apache 2.0 and MIT licenses.
