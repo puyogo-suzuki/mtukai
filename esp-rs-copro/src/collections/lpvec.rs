@@ -41,10 +41,18 @@ struct LPVecInner {
     capacity : Cap
 }
 
-#[derive(Debug)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum LPTryReserveError {
     CapacityOverflow,
     AllocError,
+}
+impl fmt::Debug for LPTryReserveError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LPTryReserveError::CapacityOverflow => write!(f, "CapacityOverflow"),
+            LPTryReserveError::AllocError => write!(f, "AllocError"),
+        }
+    }
 }
 
 impl LPVecInner {
