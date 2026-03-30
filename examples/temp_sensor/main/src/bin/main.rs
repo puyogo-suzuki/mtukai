@@ -47,8 +47,6 @@ fn sht30_main() -> !{
         "../lp/target/riscv32imac-unknown-none-elf/release/temp-sensor-lp"
     );
     {
-        let _gpio1 : LowPowerOutput<'_, 1> = LowPowerOutput::new(peripherals.GPIO1);
-        LP_IO::regs().out_data_w1ts().write(|w| unsafe { w.bits(1 << 1) });
         let gpio6 = LowPowerOutputOpenDrain::new(peripherals.GPIO6);
         let gpio7 = LowPowerOutputOpenDrain::new(peripherals.GPIO7);
         
@@ -58,21 +56,15 @@ fn sht30_main() -> !{
             gpio7,
             Rate::from_khz(2));
 
-        // disable pull-up.
-        LP_IO::regs().gpio(6).modify(|_, w| w.fun_wpu().clear_bit());
-        LP_IO::regs().gpio(7).modify(|_, w| w.fun_wpu().clear_bit());
-
         let mut parcel = MainLPParcel {
             i2c : LPI2C::new(i2c),
             result : LPVec::new(),
             measurement_count : 30
         };
-        LP_IO::regs().out_data_w1tc().write(|w| unsafe { w.bits(1 << 1) });
 
         if let Err(e) = lp_core_code.run_light_sleep(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut Rtc::new(peripherals.LPWR), &mut parcel) {
             println!("Error running LP core: {}", e);
         }
-        LP_IO::regs().out_data_w1ts().write(|w| unsafe { w.bits(1 << 1) });
         for i in parcel.result.iter() {
             match i {
                 Some(i) => {

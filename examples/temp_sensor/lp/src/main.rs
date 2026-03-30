@@ -155,8 +155,7 @@ ulp_lp_core_lp_timer_intr_enable:
     or	a5,a5,a0
     sw	a5,64(a4)
     ret
-"
-);
+");
 
 use core::arch::asm;
 
@@ -169,6 +168,7 @@ fn delay_micros(us: u32) {
         return;
     }
     unsafe {
+        ulp_lp_core_lp_timer_intr_enable(true);
         ulp_lp_core_lp_timer_set_wakeup_ticks((us as u64) * 17 / 125); // 136 kHz
         if us < 1000 {
             // wfi version
@@ -181,6 +181,8 @@ fn delay_micros(us: u32) {
             // disable interruption
             asm!("csrrw x0, mie, {mie}", mie = in(reg) mie_save, options(nomem, nostack));
             asm!("csrrw x0, mstatus, {mstatus}", mstatus = in(reg) mstatus_save, options(nomem, nostack));
+            (0x600B_0C0C as *mut u32).write_volatile(0); // disable LP timer.
+            (0x600b0c44 as *mut u32).write_volatile(1 << 31); // Clear LP timer interrupt
         } else {
             // sleep version
             // lp_core_ll_set_wakeup_source(LP_CORE_LL_WAKEUP_SOURCE_LP_TIMER);
@@ -208,16 +210,6 @@ fn read_sht30(me: &mut LPI2C) -> Result<TempAndHumid, LPI2CError> {
     Ok(TempAndHumid::new(temperature / 100, humidity / 100))
 }
 
-fn sht30_main() -> ! {
-    let v: &mut MainLPParcel = get_transfer::<MainLPParcel>().unwrap();
-    for _i in 0..v.measurement_count {
-        v.result.push(read_sht30(&mut v.i2c).ok());
-        delay_millis(60*1000-20);
-    }
-    wake_hp_core();
-    lp_core_halt()
-}
-
 #[entry]
 fn main() -> ! {
     unsafe {
@@ -226,7 +218,12 @@ fn main() -> ! {
         if sp_bottom != 0 {
             sleep_restore();
         }
-        ulp_lp_core_lp_timer_intr_enable(true);
     }
-    sht30_main();
+    let v: &mut MainLPParcel = get_transfer::<MainLPParcel>().unwrap();
+    for _i in 0..v.measurement_count {
+        v.result.push(read_sht30(&mut v.i2c).ok());
+        delay_millis(1000-20);
+    }
+    wake_hp_core();
+    lp_core_halt()
 }
