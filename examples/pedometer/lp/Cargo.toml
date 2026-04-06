@@ -1,0 +1,27 @@
+[package]
+name = "pedometer-lp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+esp-lp-hal = { version = "0.3.0", features = ["esp32c6"]}
+
+embedded-hal      = { version = "1.0.0" }
+cfg-if = "1.0.3"
+panic-halt = "0.2.0"
+
+esp-rs-copro = { path = "../../../esp-rs-copro", features=["is-lp-core", "esp32c6"] }
+esp-rs-copro-procmacro = { path = "../../../esp-rs-copro-procmacro", features=["is-lp-core"] }
+
+pedometer-shared = { path = "../shared" }
+[profile.dev]
+opt-level = 's'
+
+[profile.release]
+codegen-units    = 1     # LLVM can perform better optimizations using a single thread
+debug            = 2
+debug-assertions = false
+incremental      = false
+lto              = 'fat'
+opt-level        = 's'
+overflow-checks  = false
