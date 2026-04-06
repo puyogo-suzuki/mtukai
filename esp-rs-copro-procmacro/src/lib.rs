@@ -470,6 +470,20 @@ pub fn movable_object_derive(input: TokenStream) -> TokenStream {
         quote!{#ident}
     } else { quote!{crate} };
     let name = &input.ident;
+    let mut impl_generics_with_bounds = input.generics.clone();
+    {
+        let type_param_idents: Vec<Ident> = impl_generics_with_bounds
+            .type_params()
+            .map(|p| p.ident.clone())
+            .collect();
+        let where_clause = impl_generics_with_bounds.make_where_clause();
+        for ident in type_param_idents {
+            where_clause
+                .predicates
+                .push(syn::parse_quote!(#ident: #esp_copro_crate::movableobject::MovableObject));
+        }
+    }
+    let (impl_generics, ty_generics, where_clause) = impl_generics_with_bounds.split_for_impl();
     match input.data {
         Data::Struct(s) => {
             let member_names = s.fields.iter().enumerate().map(|(i, f)| {
@@ -487,16 +501,16 @@ pub fn movable_object_derive(input: TokenStream) -> TokenStream {
                 quote! {self.#name.wrap_move_to_lp( (&mut (*dest).#name) as * mut _ as * mut u8)?;}
             });
             let expanded = quote! {
-                impl #esp_copro_crate::movableobject::MovableObject for #name {
+                impl #impl_generics #esp_copro_crate::movableobject::MovableObject for #name #ty_generics #where_clause {
                     unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), #esp_copro_crate::EspCoproError> {
                         use #esp_copro_crate::movableobjectwrapper::*;
-                        let dest = dest as * mut #name;
+                        let dest = dest as * mut #name #ty_generics;
                         #(#move_to_mains)*
                         Ok(())
                     }
                     unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), #esp_copro_crate::EspCoproError> {
                         use #esp_copro_crate::movableobjectwrapper::*;
-                        let dest = dest as * mut #name;
+                        let dest = dest as * mut #name #ty_generics;
                         #(#move_to_lps)*
                         Ok(())
                     }
@@ -573,17 +587,17 @@ pub fn movable_object_derive(input: TokenStream) -> TokenStream {
                 gen_arm(&fname, v)
             });
             quote! {
-                impl #esp_copro_crate::movableobject::MovableObject for #name {
+                impl #impl_generics #esp_copro_crate::movableobject::MovableObject for #name #ty_generics #where_clause {
                     unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), #esp_copro_crate::EspCoproError> {
                         use #esp_copro_crate::movableobjectwrapper::*;
-                        unsafe { (dest as * mut #name).write_volatile(match &self {
+                        unsafe { (dest as * mut #name #ty_generics).write_volatile(match &self {
                             #(#arms_main)*
                         }); }
                         Ok(())
                     }
                     unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), #esp_copro_crate::EspCoproError> {
                         use #esp_copro_crate::movableobjectwrapper::*;
-                        unsafe { (dest as * mut #name).write_volatile(match &self {
+                        unsafe { (dest as * mut #name #ty_generics).write_volatile(match &self {
                             #(#arms_lp)*
                         }); }
                         Ok(())
