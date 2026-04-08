@@ -312,7 +312,7 @@ impl<T: ?Sized + MovableObject> MovableObject for LPBox<T> {
         Ok(())
     }
     #[cfg(feature = "is-lp-core")]
-    unsafe fn move_to_lp(&self, dest: *mut u8) -> Result<(), crate::EspCoproError> {
+    unsafe fn move_to_lp(&self, _dest: *mut u8) -> Result<(), crate::EspCoproError> {
         Err(EspCoproError::NotAllowed)
     }
 }
