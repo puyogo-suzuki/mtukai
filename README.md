@@ -12,6 +12,8 @@ The crate is designed to be used in `no_std` environments and provides a custom 
 
 Currently supports the following ESP32 microcontrollers:
 - **ESP32-C6**: Enable the `esp32c6` feature
+  - GPIO and I2C are supported.
+- **ESP32-S3**: Enable the `esp32s3` feature
 
 ## Key Features
 
@@ -93,9 +95,12 @@ lp_box.move_to_lp()?;
 
 ## Features
 
-- `is-lp-core`: Build for the LP coprocessor
-- `has-lp-core`: Build for the main processor with LP coprocessor support
-- `esp32c6`: Enable ESP32-C6 specific features
+- Processor selection: either features must be enabled.
+  - `is-lp-core`: Build for the LP coprocessor
+  - `has-lp-core`: Build for the main processor with LP coprocessor support
+- Platform: either features must be enabled.
+  - `esp32c6`: Enable ESP32-C6 specific features
+  - `esp32s3`: Enable ESP32-S3 specific features
 - `custom_range`: Use custom memory range configuration
 <!-- - `unsafe-vtable`: Enable unsafe vtable operations -->
 

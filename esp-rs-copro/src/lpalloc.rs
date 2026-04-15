@@ -79,7 +79,7 @@ unsafe extern "Rust" {
     #[link_name = "__lpcoproc_allocator_dealloc"]
     pub(crate) fn lp_allocator_dealloc(ptr: * mut u8, layout: Layout);
 
-    #[cfg(any(not(any(feature = "esp32c6")), feature = "custom_range"))]
+    #[cfg(any(not(any(feature = "esp32c6", feature = "esp32s3")), feature = "custom_range"))]
     #[link_name = "__lpcoproc_allocator_get_lp_mem_begin_and_len"]
     pub(crate) fn get_lp_mem_begin_and_len() -> (usize, usize);
 }
@@ -91,16 +91,106 @@ const LP_ADDRESS_LEN : usize = 0x0004_0000;
 #[cfg(feature = "esp32c6")]
 const LP_ADDRESS_BASE : usize = 0x5000_0000;
 
-#[cfg(all(feature = "nottest", any(feature = "esp32c6"), not(feature = "custom_range")))]
-pub(crate) fn get_lp_mem_begin_and_len() -> (usize, usize) {
+#[cfg(feature = "esp32s3")]
+const LP_ADDRESS_MAX : usize = LP_ADDRESS_BASE + LP_ADDRESS_LEN;
+#[cfg(feature = "esp32s3")]
+const LP_ADDRESS_LEN : usize = 0x0002_0000;
+#[cfg(feature = "esp32s3")]
+const LP_ADDRESS_BASE : usize = 0x5000_0000;
+
+#[cfg(all(feature = "nottest", any(feature = "esp32c6", feature = "esp32s3"), not(feature = "custom_range")))]
+#[inline(always)]
+pub(crate) const fn get_lp_mem_begin_and_len() -> (usize, usize) {
     (LP_ADDRESS_BASE, LP_ADDRESS_LEN)
 }
 
+#[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]
+#[inline(always)]
+pub fn address_translate_to_lp<T>(addr : * mut T) -> * mut T where T : ?Sized {
+    if in_lp_mem_range(addr) {
+        addr.wrapping_byte_sub(LP_ADDRESS_BASE)
+    } else {
+        addr
+    }
+}
+
+#[cfg(any(not(feature = "esp32s3"), feature = "is-lp-core"))]
+#[inline(always)]
+pub const fn address_translate_to_lp<T>(addr : * mut T) -> * mut T where T : ?Sized {
+    addr
+}
+
+#[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]
+#[inline(always)]
+pub fn address_translate_to_main<T>(addr : * mut T) -> * mut T where T : ?Sized {
+    if in_lp_mem_range_translated(addr) {
+        addr.wrapping_byte_add(LP_ADDRESS_BASE)
+    } else {
+        addr
+    }
+}
+    
+#[cfg(any(not(feature = "esp32s3"), feature = "is-lp-core"))]
+#[inline(always)]
+pub const fn address_translate_to_main<T>(addr : * mut T) -> * mut T where T : ?Sized {
+    addr
+}
+
+
+#[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]
+#[inline(always)]
+pub fn address_translate_to_main_const<T>(addr : * const T) -> * const T where T : ?Sized {
+    if in_lp_mem_range_translated(addr) {
+        addr.wrapping_byte_add(LP_ADDRESS_BASE)
+    } else {
+        addr
+    }
+}
+    
+#[cfg(any(not(feature = "esp32s3"), feature = "is-lp-core"))]
+#[inline(always)]
+pub const fn address_translate_to_main_const<T>(addr : * const T) -> * const T where T : ?Sized {
+    addr
+}
+
 /// Check whether the given address is in the LP memory range.
-pub fn in_lp_mem_range<T>(addr : * const T) -> bool {
+#[inline(always)]
+#[cfg(not(feature = "esp32s3"))]
+pub fn in_lp_mem_range<T>(addr : * const T) -> bool where T : ?Sized {
     let addr = addr as * const () as usize;
     #[allow(unused_unsafe)]
     let (base, len) = unsafe { get_lp_mem_begin_and_len() };
+    addr.wrapping_sub(base) < len
+}
+
+/// Check whether the given address is in the LP memory range.
+#[inline(always)]
+#[cfg(feature = "esp32s3")]
+pub fn in_lp_mem_range<T>(addr : * const T) -> bool where T : ?Sized {
+    let addr = addr as * const () as usize;
+    #[allow(unused_unsafe)]
+    let (base, len) = unsafe { get_lp_mem_begin_and_len() };
+    addr.wrapping_sub(base) < len
+}
+
+#[cfg(feature = "esp32s3")]
+const LP_ADDRESS_TRANSLATED_MAX : usize = LP_ADDRESS_TRANSLATED_BASE + LP_ADDRESS_TRANSLATED_LEN;
+#[cfg(feature = "esp32s3")]
+const LP_ADDRESS_TRANSLATED_LEN : usize = 0x0001_FF00;
+#[cfg(feature = "esp32s3")]
+const LP_ADDRESS_TRANSLATED_BASE : usize = 0x100; // For dangling pointers. We believe that the code on LP will be longer than 0x100 and typeof::<T> will be smaller than 0x100.
+
+#[cfg(feature = "esp32s3")]
+#[inline(always)]
+pub(crate) const fn get_lp_mem_begin_and_len_translated() -> (usize, usize) {
+    (LP_ADDRESS_TRANSLATED_BASE, LP_ADDRESS_TRANSLATED_LEN)
+}
+#[cfg(feature = "esp32s3")]
+#[inline(always)]
+fn in_lp_mem_range_translated<T>(addr : * const T) -> bool where T : ?Sized {
+    let addr = addr as * const () as usize;
+    #[allow(unused_unsafe)]
+    let (base, len) = unsafe { get_lp_mem_begin_and_len_translated() };
     addr.wrapping_sub(base) < len
 }
 
@@ -135,13 +225,13 @@ unsafe impl<const SIZE : usize> GlobalAlloc for ImplLPAllocator<SIZE> {
         unsafe {
             let layout = layout.align_to(core::mem::align_of::<FreeBlock>()).unwrap().pad_to_align();
             let total_size = layout.size() + core::mem::size_of::<BlockHeader>();
-            let mut current_ptr: *mut *mut BlockHeader = self.free_ptr.get();
-            let mut current = *current_ptr;
+            let mut current_ptr: *mut *mut BlockHeader =  self.free_ptr.get();
+            let mut current = address_translate_to_main(*current_ptr);
             while !current.is_null() {
                 let fb = BlockHeader::get_value::<FreeBlock>(current);
                 if (*current).size < total_size {
                     current_ptr = &(*fb).next as * const _ as * mut * mut BlockHeader;
-                    current = (*fb).next;
+                    current = address_translate_to_main((*fb).next);
                     continue;
                 }
                 // found a block
@@ -151,12 +241,12 @@ unsafe impl<const SIZE : usize> GlobalAlloc for ImplLPAllocator<SIZE> {
                     let new_block = (current as usize + total_size) as * mut BlockHeader;
                     BlockHeader::init_header_value(new_block, remaining, 1 as * mut u8, current, (*current).next);
                     if !(*current).next.is_null() {
-                        (*(*current).next).prev = new_block;
+                        (*address_translate_to_main((*current).next)).prev = address_translate_to_lp(new_block);
                     }
-                    (*current).next = new_block;
+                    (*current).next = address_translate_to_lp(new_block);
                     (*current).size = total_size;
                     (*(BlockHeader::get_value::<FreeBlock>(new_block))).next = (*fb).next;
-                    *current_ptr = new_block;
+                    *current_ptr = address_translate_to_lp(new_block);
                 } else {
                     *current_ptr = (*fb).next;
                 }
@@ -171,13 +261,13 @@ unsafe impl<const SIZE : usize> GlobalAlloc for ImplLPAllocator<SIZE> {
             let header = (ptr as usize - core::mem::size_of::<BlockHeader>()) as * mut BlockHeader;
             // Coalesce with previous block if free
             if !(*header).prev.is_null() {
-                let prev_header = (*header).prev;
+                let prev_header = address_translate_to_main((*header).prev);
                 if (*prev_header).vtable.is_null() { // check whether the previous block is free.
                     // Merge
                     (*prev_header).size += (*header).size;
                     (*prev_header).next = (*header).next;
                     if !(*header).next.is_null() {
-                        (*(*header).next).prev = prev_header;
+                        (*address_translate_to_main((*header).next)).prev = (*header).prev;
                     }
                     return;
                 }
@@ -185,7 +275,7 @@ unsafe impl<const SIZE : usize> GlobalAlloc for ImplLPAllocator<SIZE> {
             (*header).vtable = null_mut(); // mark as free
             let fb = BlockHeader::get_value::<FreeBlock>(header);
             (*(fb)).next = self.free_ptr.get().read();
-            self.free_ptr.get().write(header);
+            self.free_ptr.get().write(address_translate_to_lp(header));
         }
     }
 }

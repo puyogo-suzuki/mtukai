@@ -128,6 +128,7 @@
 #![cfg_attr(feature="nottest", no_std)]
 #![feature(layout_for_ptr)]
 #![feature(ptr_internals)]
+#![feature(ptr_as_ref_unchecked)] // Xtensa toolchain is old. Do not remove this.
 #![feature(temporary_niche_types)]
 #![feature(sized_type_properties)]
 #![feature(rustc_attrs)]
@@ -226,7 +227,7 @@ pub mod transfer_functions {
     /// The value is moved, and the ownership is transferred to the LP coprocessor.
     /// The caller must ensure that the value is not used on the main coprocessor after this function is called.
     pub fn transfer_to_lp<T : MovableObject>(src : &T) -> Result<*mut u8, EspCoproError> {
-        LPBox::<T>::write_to_lp(src)
+        LPBox::<T>::write_to_lp(src).map(|ptr| crate::lpalloc::address_translate_to_lp(ptr))
     }
 
     /// This is used in esp-rs-copro-procmacro.
@@ -234,7 +235,7 @@ pub mod transfer_functions {
     /// The value is moved, and the ownership is transferred to the main coprocessor.
     /// The caller must ensure that the value is not used on the LP coprocessor after this function is called.
     pub unsafe fn transfer_to_main<T : MovableObject>(src : * const u8, dst : &mut T) -> Result<(), EspCoproError> {
-        if let Some(v) = unsafe{(src as * const T).as_ref()} {
+        if let Some(v) = unsafe{(crate::lpalloc::address_translate_to_main_const(src) as * const T).as_ref()} {
             unsafe{v.move_to_main(dst as * mut T as * mut u8)?;}
             remove_by_main(dst as * mut T as usize);
             cleanup();

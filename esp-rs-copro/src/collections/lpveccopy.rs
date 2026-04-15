@@ -37,7 +37,7 @@ impl<T : Copy> LPVecCopy<T> {
     }
 
     #[inline]
-    pub const unsafe fn from_raw_parts(ptr : * mut T, len : usize, capacity : usize) -> Self {
+    pub unsafe fn from_raw_parts(ptr : * mut T, len : usize, capacity : usize) -> Self {
         LPVecCopy { vec_inner : unsafe{ LPVec::from_raw_parts(ptr as * mut LPAdapter<T>, len, capacity) } }
     }
 
@@ -60,13 +60,13 @@ impl<T : Copy> LPVecCopy<T> {
     #[rustc_never_returns_null_ptr]
     #[rustc_as_ptr]
     #[inline]
-    pub const fn as_mut_ptr(&mut self) -> *mut T {
+    pub fn as_mut_ptr(&mut self) -> *mut T {
         self.vec_inner.as_mut_ptr() as * mut T
     }
     #[rustc_never_returns_null_ptr]
     #[rustc_as_ptr]
     #[inline]
-    pub const fn as_ptr(&self) -> *const T {
+    pub fn as_ptr(&self) -> *const T {
         self.vec_inner.as_ptr() as * const T
     }
 
@@ -275,12 +275,12 @@ impl<T : Copy> LPVecCopy<T> {
     }
 
     #[inline]
-    pub const fn as_slice(&self) -> &[T] {
+    pub fn as_slice(&self) -> &[T] {
         unsafe { slice::from_raw_parts(self.as_ptr(), self.len()) }
     }
 
     #[inline]
-    pub const fn as_mut_slice(&mut self) -> &mut [T] {
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
         unsafe { slice::from_raw_parts_mut(self.as_mut_ptr(), self.len()) }
     }
 

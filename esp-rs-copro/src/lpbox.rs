@@ -1,6 +1,6 @@
 use core::{fmt::Debug, mem::{self, MaybeUninit}, ops::{Deref, DerefMut}, ptr::NonNull};
 
-use crate::{movableobject::MovableObject, lpalloc, EspCoproError};
+use crate::{EspCoproError, lpalloc::{self, address_translate_to_lp, address_translate_to_main, address_translate_to_main_const}, movableobject::MovableObject};
 #[cfg(feature = "nottest")]
 use alloc::alloc;
 #[cfg(feature = "nottest")]
@@ -190,7 +190,7 @@ impl<T: MovableObject> LPBox<T> {
         unsafe {
             let ptr = lpalloc::lp_allocator_alloc(core::alloc::Layout::for_value(&value)) as * mut T;
             ptr.write_volatile(value);
-            LPBox(NonNull::new_unchecked(ptr as * mut T))
+            LPBox(NonNull::new_unchecked(address_translate_to_lp(ptr)))
         }
     }
 }
@@ -209,12 +209,32 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
 
     /// Convert an [`LPBox`] into a [`Box`]. The value is not moved.
     pub fn from_raw(raw : * mut T) -> Self {
+        LPBox::from_raw_without_translation(address_translate_to_lp(raw))
+    }
+
+    /// Convert an [`LPBox`] into a [`Box`]. The value is not moved.
+    /// The address will not be translated.
+    pub fn from_raw_without_translation(raw : * mut T) -> Self {
         unsafe { LPBox(NonNull::new_unchecked(raw)) }
     }
 
     /// Convert an [`LPBox`] into a raw pointer. The value is not moved, and the caller takes ownership of the memory.
     #[must_use = "losing the pointer will leak memory"]
     pub fn into_raw(self) -> * mut T {
+        address_translate_to_main(self.into_raw_without_translation())
+    }
+
+    /// Get a raw pointer to the value.
+    /// The value is not moved.
+    /// The ownership is not transferred, and the caller must ensure that the value is not dropped while using the pointer.
+    pub fn as_ptr(&self) -> * const T {
+        address_translate_to_main_const(self.as_ptr_without_translation())
+    }
+
+    /// Convert an [`LPBox`] into a raw pointer. The value is not moved, and the caller takes ownership of the memory.
+    /// The address will not be translated.
+    #[must_use = "losing the pointer will leak memory"]
+    pub fn into_raw_without_translation(self) -> * mut T {
         let b = mem::ManuallyDrop::new(self);
         b.0.as_ptr()
     }
@@ -222,15 +242,16 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     /// Get a raw pointer to the value.
     /// The value is not moved.
     /// The ownership is not transferred, and the caller must ensure that the value is not dropped while using the pointer.
-    pub fn as_ptr(&self) -> * const T {
-        self.0.as_ptr() as * const T
+    /// The address will not be translated.
+    pub fn as_ptr_without_translation(&self) -> * const T {
+        self.0.as_ptr()
     }
 
     /// Get a mutable raw pointer to the value.
     /// The value is not moved.
     /// The ownership is not transferred, and the caller must ensure that the value is not dropped while using the pointer.
     pub fn as_mut_ptr(&mut self) -> * mut T {
-        self.0.as_ptr()
+        address_translate_to_main(self.0.as_ptr())
     }
 
     /// This is for internal-use.
@@ -272,14 +293,14 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     /// If the value is already in the LP memory, it is not moved again.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub unsafe fn get_moved_to_lp(&self) -> Result<LPBox<T>, EspCoproError> {
-        unsafe { Ok(LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_lp(self.0.as_ref())? as usize))) )}
+        unsafe { Ok(LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(address_translate_to_lp(Self::write_to_lp(self.0.as_ref())?) as usize))) )}
     }
     /// This is for internal-use.
     /// Returns a reference to the moved value. The value is moved to the main memory.
     /// If the value is already in the main memory, the value on the main memory is overwritten.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub unsafe fn get_moved_to_main(&self) -> Result<LPBox<T>, EspCoproError> {
-        unsafe { Ok(LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_main(self.0.as_ref())? as usize))) )}
+        unsafe { Ok(LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_main(address_translate_to_main(self.0.as_ptr()).as_ref_unchecked())? as usize))) )}
     }
     // call the main processor's function.
     // #[cfg(feature = "is-lp-core")]
@@ -291,7 +312,7 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
 
 impl<T: MovableObject + Copy> LPBox<MaybeUninit<T>> {
     pub unsafe fn assume_init(self) -> LPBox<T> {
-        LPBox::from_raw(LPBox::into_raw(self) as * mut T)
+        LPBox::from_raw_without_translation(LPBox::into_raw_without_translation(self) as * mut T)
     }
 }
 
@@ -302,7 +323,7 @@ impl<T: ?Sized + MovableObject> MovableObject for LPBox<T> {
         Ok(())
     }
     #[cfg(feature = "is-lp-core")]
-    unsafe fn move_to_main(&self, dest: *mut u8) -> Result<(), crate::EspCoproError> {
+    unsafe fn move_to_main(&self, _dest: *mut u8) -> Result<(), crate::EspCoproError> {
         Err(EspCoproError::NotAllowed)
     }
 
@@ -320,12 +341,12 @@ impl<T: ?Sized + MovableObject> MovableObject for LPBox<T> {
 impl<T : ?Sized + MovableObject> Deref for LPBox<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
-        unsafe { self.0.as_ref() }
+        unsafe { address_translate_to_main(self.0.as_ptr()).as_ref_unchecked() }
     }
 }
 impl<T : ?Sized + MovableObject> DerefMut for LPBox<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { self.0.as_mut() }
+        unsafe { address_translate_to_main(self.0.as_ptr()).as_mut_unchecked() }
     }
 }
 
@@ -341,8 +362,8 @@ impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
         if !lpbox_static::check_lpbox_drop_enable() {
             return;
         }
-        unsafe{self.0.drop_in_place();}
-        let ptr = self.0.as_ptr() as * mut u8;
+        unsafe{self.as_mut_ptr().drop_in_place();}
+        let ptr = self.as_ptr() as * mut u8;
         let lay = unsafe {core::alloc::Layout::for_value(self.0.as_ref())};
         lp_dealloc(ptr, lay);
     }

@@ -194,7 +194,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         }
     }
 
-    let hal_crate = if cfg!(any(feature = "is-lp-core", feature = "is-ulp-core")) {
+    let hal_crate = if cfg!(feature = "is-lp-core") {
         crate_name("esp-lp-hal")
     } else {
         crate_name("esp-hal")
@@ -209,7 +209,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     
     let copro_crate_use = if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-rs-copro") {
         let ident = Ident::new(name, Span::call_site().into());
-        quote!{ use #ident ::{ transfer_functions::*, lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject, EspCoproError, try_copro_lock, copro_unlock}; }
+        quote!{ use #ident ::{ transfer_functions::*, prelude::*, lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject, EspCoproError, try_copro_lock, copro_unlock}; }
     } else { quote!{} };
 
     let args: LoadLpArgs = match syn::parse(input) {
@@ -240,10 +240,12 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     sections.sort_by(|a, b| a.address().partial_cmp(&b.address()).unwrap());
 
     let mut binary: Vec<u8> = Vec::new();
-    let mut last_address = if cfg!(feature = "has-lp-core") {
-        0x5000_0000
-    } else {
+    let mut last_address = if args.lp_start.is_some() {
+        u64::MAX // We do not care.
+    } else if cfg!(any(feature = "esp32s3", feature = "esp32s2")) {
         0x0
+    } else {
+        0x5000_0000
     };
 
     if sections.is_empty() {
@@ -251,16 +253,19 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
             Span::call_site().into(),
             "Given file doesn't seem to have any allocatable sections.",
         )
-        .to_compile_error()
-        .into();
-    } else if sections[0].address() < last_address {
+        .to_compile_error().into();
+    } else if  sections[0].address() < last_address {
         return Error::new(
             Span::call_site().into(),
-            "Given file doesn't seem to be a valid LP/ULP core application.",
+            format!(
+                "First section address is below expected base address (expected >= 0x{:x}, got 0x{:x})",
+                last_address,
+                sections[0].address()
+            ),
         )
-        .to_compile_error()
-        .into();
+        .to_compile_error().into();
     }
+
 
     for section in sections {
         if section.address() > last_address {
@@ -302,7 +307,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         .filter(|v: &proc_macro2::TokenStream| !v.is_empty())
         .collect();
 
-    #[cfg(feature = "has-lp-core")]
+    #[cfg(feature = "esp32c6")]
     let imports = quote! {
         use #hal_crate::lp_core::LpCore;
         use #hal_crate::lp_core::LpCoreWakeupSource;
@@ -314,7 +319,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         use #hal_crate::rtc_cntl::sleep::WakeFromLpCoreWakeupSource;
         #copro_crate_use;
     };
-    #[cfg(feature = "has-ulp-core")]
+    #[cfg(feature = "esp32s3")]
     let imports = quote! {
         use #hal_crate::ulp_core::UlpCore as LpCore;
         use #hal_crate::ulp_core::UlpCoreWakeupSource as LpCoreWakeupSource;
@@ -322,13 +327,14 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         #copro_crate_use;
     };
 
-    #[cfg(feature = "has-lp-core")]
+    #[cfg(feature = "esp32c6")]
     let rtc_code_start = quote! { _rtc_fast_data_start };
-    #[cfg(feature = "has-ulp-core")]
+    #[cfg(feature = "esp32s3")]
     let rtc_code_start = quote! { _rtc_slow_data_start };
 
     let (transfer, transfer_back) =
         if let Some(a) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_TRANSFER")).map(|s| s.address()) {
+            let a = a as u32 + if cfg!(feature = "esp32s3") { 0x5000_0000 } else { 0 };
             (quote!{
                 unsafe {
                     use core::alloc::GlobalAlloc;
@@ -352,8 +358,11 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         } else { (quote! {}, quote! {})};
     let allocsym = obj_file.symbols().find(|s| s.name().map_or(false, |v| v.starts_with("__COPRO_ALLOCATOR_")));
     let allocfun = if let Some(a) = allocsym {
-        let addr = a.address();
+        let mut addr = a.address() as u32;
         let size = a.name().ok().and_then(|v| v["__COPRO_ALLOCATOR_".len()..].parse::<usize>().ok());
+        if cfg!(feature = "esp32s3") {
+            addr += 0x5000_0000;
+        }
         quote!{
             pub fn get_allocator() -> *mut ImplLPAllocator<#size> {
                 #addr as *mut ImplLPAllocator<#size>
@@ -391,21 +400,20 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         }
     }
     
+    let sleeplight = if cfg!(feature = "esp32c6") {
+        quote! { rtc.sleep_light(&[&WakeFromLpCoreWakeupSource::new()]) }
+    } else {
+        quote! { rtc.sleep_light(&[&UlpWakeupSource::new()]) }
+    };
+
     quote! {
         {
             #imports
 
             struct LpCoreCode {}
-
             static LP_CODE: &[u8] = &[#(#binary),*];
-
-            unsafe extern "C" {
-                static #rtc_code_start: u32;
-            }
-
-            unsafe {
-                core::ptr::copy_nonoverlapping(LP_CODE as *const _ as *const u8, #copy_dest, LP_CODE.len());
-            }
+            unsafe extern "C" { static #rtc_code_start: u32; }
+            unsafe { core::ptr::copy_nonoverlapping(LP_CODE as *const _ as *const u8, #copy_dest, LP_CODE.len()); }
 
             impl LpCoreCode {
                 pub fn run_light_sleep<T : MovableObject>(
@@ -419,7 +427,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                     try_copro_lock()?;
                     #alloccall
                     lp_core.run(wakeup_source);
-                    rtc.sleep_light(&[&WakeFromLpCoreWakeupSource::new()]);
+                    #sleeplight;
                     #transfer_back;
                     copro_unlock();
                     Ok(())
