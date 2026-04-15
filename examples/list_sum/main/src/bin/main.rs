@@ -64,7 +64,7 @@ fn main() -> ! {
     // generator version: 0.5.0
     esp_alloc::heap_allocator!(size: 72 * 1024);
     esp_println::logger::init_logger_from_env();
-    let delay = Delay::new();
+    let delay = esp_hal::delay::Delay::new();
     let peripherals = esp_hal::init(esp_hal::Config::default());
     
     #[cfg(feature = "esp32c6")]
