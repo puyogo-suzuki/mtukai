@@ -12,8 +12,9 @@ The crate is designed to be used in `no_std` environments and provides a custom 
 
 Currently supports the following ESP32 microcontrollers:
 - **ESP32-C6**: Enable the `esp32c6` feature
-  - GPIO and I2C are supported.
+  - Supported peripherals: GPIO, I2C
 - **ESP32-S3**: Enable the `esp32s3` feature
+  - Supported peripherals: GPIO
 
 ## Key Features
 
