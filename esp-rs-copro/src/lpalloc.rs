@@ -84,14 +84,14 @@ unsafe extern "Rust" {
     pub(crate) fn get_lp_mem_begin_and_len() -> (usize, usize);
 }
 
-#[cfg(feature = "esp32c6")]
+#[cfg(all(feature = "esp32c6", feature = "has-lp-core"))]
 const LP_ADDRESS_MAX : usize = LP_ADDRESS_BASE + LP_ADDRESS_LEN;
 #[cfg(feature = "esp32c6")]
 const LP_ADDRESS_LEN : usize = 0x0004_0000;
 #[cfg(feature = "esp32c6")]
 const LP_ADDRESS_BASE : usize = 0x5000_0000;
 
-#[cfg(feature = "esp32s3")]
+#[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]
 const LP_ADDRESS_MAX : usize = LP_ADDRESS_BASE + LP_ADDRESS_LEN;
 #[cfg(feature = "esp32s3")]
 const LP_ADDRESS_LEN : usize = 0x0002_0000;
@@ -173,19 +173,19 @@ pub fn in_lp_mem_range<T>(addr : * const T) -> bool where T : ?Sized {
     addr.wrapping_sub(base) < len
 }
 
-#[cfg(feature = "esp32s3")]
+#[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]
 const LP_ADDRESS_TRANSLATED_MAX : usize = LP_ADDRESS_TRANSLATED_BASE + LP_ADDRESS_TRANSLATED_LEN;
-#[cfg(feature = "esp32s3")]
+#[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]
 const LP_ADDRESS_TRANSLATED_LEN : usize = 0x0001_FF00;
-#[cfg(feature = "esp32s3")]
+#[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]
 const LP_ADDRESS_TRANSLATED_BASE : usize = 0x100; // For dangling pointers. We believe that the code on LP will be longer than 0x100 and typeof::<T> will be smaller than 0x100.
 
-#[cfg(feature = "esp32s3")]
+#[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]
 #[inline(always)]
 pub(crate) const fn get_lp_mem_begin_and_len_translated() -> (usize, usize) {
     (LP_ADDRESS_TRANSLATED_BASE, LP_ADDRESS_TRANSLATED_LEN)
 }
-#[cfg(feature = "esp32s3")]
+#[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]
 #[inline(always)]
 fn in_lp_mem_range_translated<T>(addr : * const T) -> bool where T : ?Sized {
     let addr = addr as * const () as usize;

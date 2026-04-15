@@ -142,7 +142,7 @@
 #![feature(trusted_len)]
 #![feature(exact_size_is_empty)]
 #![feature(unsafe_cell_access)]
-#![feature(cfg_target_has_atomic)]
+#![cfg_attr(feature = "has-lp-core", feature(cfg_target_has_atomic))]
 #[cfg(feature = "nottest")]
 extern crate alloc;
 /// This module provides functions and types related to memory allocation in the LP coprocessor. It includes a custom allocator implementation, as well as functions for checking whether an address is in the LP memory range.

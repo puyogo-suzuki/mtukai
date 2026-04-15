@@ -67,14 +67,6 @@ impl LPVecInner {
         let mut ret = LPVecInner::new(elem_layout);
         ret.grow_or_shrink(capacity, elem_layout).ok().map(|_| ret)
     }
-    fn with_capacity_zerod(capacity : usize, elem_layout : Layout) -> Option<Self> {
-        #[allow(unused_mut)] // acctually mutated in the next unsafe line!
-        let mut ret = LPVecInner::try_with_capacity(capacity, elem_layout)?;
-        unsafe {
-            core::ptr::write_bytes(ret.ptr.as_ptr(), 0, ret.current_memory(elem_layout).size());
-        }
-        Some(ret)
-    }
 
     const fn set_ptr_and_cap(&mut self, ptr : Unique<u8>, cap : usize) {
         self.ptr = ptr;

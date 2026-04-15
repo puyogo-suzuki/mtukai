@@ -75,11 +75,6 @@ impl<T : Copy> LPVecCopy<T> {
         self.vec_inner.capacity()
     }
 
-    #[inline]
-    const fn needs_to_grow(&self, additional : usize) -> bool {
-        self.len() + additional > self.capacity()
-    }
-
     pub fn reserve_exact(&mut self, additional : usize) {
         self.vec_inner.reserve_exact(additional);
     }
