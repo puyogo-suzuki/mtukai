@@ -1,7 +1,7 @@
 #[cfg(all(feature = "has-lp-core", feature="esp32c6"))]
-use esp_hal::{gpio::{lp_io::{LowPowerInput, LowPowerOutput, LowPowerOutputOpenDrain}, InputPin, OutputPin, RtcPin}, peripherals::GPIO};
+use esp_hal::{gpio::{lp_io::{LowPowerInput, LowPowerOutput, LowPowerOutputOpenDrain}, InputPin, OutputPin, RtcPin}};
 #[cfg(all(feature = "has-lp-core", feature="esp32s3"))]
-use esp_hal::{gpio::{rtc_io::{LowPowerInput, LowPowerOutput, LowPowerOutputOpenDrain}, InputPin, OutputPin, RtcPin}, peripherals::GPIO};
+use esp_hal::{gpio::{rtc_io::{LowPowerInput, LowPowerOutput, LowPowerOutputOpenDrain}, InputPin, OutputPin, RtcPin}};
 
 #[cfg(feature = "is-lp-core")]
 use esp_lp_hal::gpio::{Input, Output};
