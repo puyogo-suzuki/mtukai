@@ -21,6 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rustc-link-search={}", out.display());
     fs::copy(source_file, out.join("link.x"))?;
     println!("cargo:rerun-if-changed={}", source_file);
+    println!("cargo:rustc-link-arg=-Tlink.x");
 
     // Done!
     Ok(())
