@@ -1,0 +1,42 @@
+[package]
+edition      = "2024"
+name         = "list-sum-main"
+version      = "0.1.0"
+
+[[bin]]
+name = "list-sum-main"
+path = "./src/bin/main.rs"
+
+[dependencies]
+esp-println = { version="0.16.1", features = ["log-04"] }
+esp-backtrace = { version="0.18.1", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { version = "0.4.0" }
+esp-hal                = { version = "=1.0.0", features = ["unstable", "log-04"] }
+esp-rs-copro           = { path = "../../../esp-rs-copro", features = ["has-lp-core"] }
+esp-rs-copro-procmacro = { path = "../../../esp-rs-copro-procmacro" , features = ["has-lp-core"] }
+
+critical-section = "1.2.0"
+esp-alloc = { version = "0.9.0" }
+
+list-sum-shared = { path = "../shared" }
+
+[features]
+esp32c6 = [ "esp-backtrace/esp32c6", "esp-bootloader-esp-idf/esp32c6", "esp-hal/esp32c6", "esp-rs-copro/esp32c6", "esp-alloc/esp32c6", "esp-rs-copro-procmacro/esp32c6" ]
+esp32s3 = [ "esp-backtrace/esp32s3", "esp-bootloader-esp-idf/esp32s3", "esp-hal/esp32s3", "esp-rs-copro/esp32s3", "esp-alloc/esp32s3", "esp-rs-copro-procmacro/esp32s3" ]
+
+[profile.dev]
+# Rust debug is too slow.
+# For debug builds always builds with some optimization
+opt-level = "s"
+
+[profile.release]
+codegen-units    = 1     # LLVM can perform better optimizations using a single thread
+debug            = 2
+debug-assertions = false
+incremental      = false
+lto              = 'fat'
+opt-level        = 's'
+overflow-checks  = false

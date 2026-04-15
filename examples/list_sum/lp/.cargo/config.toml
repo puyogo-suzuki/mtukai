@@ -1,0 +1,15 @@
+[alias]
+esp32c6 = "build --release --features=esp32c6 --target riscv32imac-unknown-none-elf"
+esp32s2 = "build --release --features=esp32s2 --target riscv32imc-unknown-none-elf"
+esp32s3 = "build --release --features=esp32s3 --target riscv32imc-unknown-none-elf"
+
+[build]
+target = "riscv32imac-unknown-none-elf"
+
+[unstable]
+build-std = ["core", "alloc", "compiler_builtins"]
+
+[target.'cfg(target_arch = "riscv32")']
+rustflags = [
+  "-C", "link-arg=-Tlink.x",
+]
