@@ -11,9 +11,9 @@ panic = 'abort'
 features = ["is-lp-core", "has-lp-core", "esp32c6", "esp32s3"]
 
 [dependencies]
-esp-println = { version = "0.16.1", features = ["log-04"], optional = true }
+esp-println = { version = "0.17.0", features = ["log-04"], optional = true }
 esp-lp-hal  = { version = "0.3.0", features = [], optional = true}
-esp-hal     = { version = "=1.0.0", features = ["unstable", "log-04"], optional = true }
+esp-hal     = { version = "=1.1.0-rc.0", features = ["unstable", "log-04"], optional = true }
 
 [dev-dependencies]
 esp-rs-copro-procmacro = { path = "../esp-rs-copro-procmacro", features=["has-lp-core"] }
