@@ -51,8 +51,6 @@ fn main() -> ! {
         "../lp/target/riscv32imac-unknown-none-elf/release/music-lp"
     );
     {
-        // let _gpio1 : LowPowerOutput<'_, 1> = LowPowerOutput::new(peripherals.GPIO1);
-
         let mut parcel = MainLPParcel::<'_> {
             score: cde(),
             outpin: LPOutput::<1>::new(peripherals.GPIO1)
