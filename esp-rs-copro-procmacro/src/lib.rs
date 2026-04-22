@@ -209,7 +209,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     
     let copro_crate_use = if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-rs-copro") {
         let ident = Ident::new(name, Span::call_site().into());
-        quote!{ use #ident ::{ transfer_functions::*, prelude::*, lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject, EspCoproError, try_copro_lock, copro_unlock}; }
+        quote!{ use #ident ::{ transfer_functions::*, lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject, EspCoproError, try_copro_lock, copro_unlock}; }
     } else { quote!{} };
 
     let args: LoadLpArgs = match syn::parse(input) {
@@ -323,6 +323,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     let imports = quote! {
         use #hal_crate::ulp_core::UlpCore as LpCore;
         use #hal_crate::ulp_core::UlpCoreWakeupSource as LpCoreWakeupSource;
+        use #hal_crate::rtc_cntl::sleep::UlpWakeupSource;
         use #hal_crate::gpio::*;
         #copro_crate_use;
     };

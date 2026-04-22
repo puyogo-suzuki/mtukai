@@ -12,13 +12,9 @@ use esp_hal::rtc_cntl::Rtc;
 use list_sum_shared::{MainLPParcel, SimpleList};
 
 #[cfg(feature="esp32c6")]
-use esp_hal::{
-    lp_core::{LpCore, LpCoreWakeupSource},
-};
+use esp_hal::lp_core::{LpCore, LpCoreWakeupSource};
 #[cfg(feature = "esp32s3")]
-use esp_hal::{
-    ulp_core::{UlpCore, UlpCoreWakeupSource},
-};
+use esp_hal::ulp_core::{UlpCore, UlpCoreWakeupSource};
 use esp_rs_copro::lpbox::LPBox;
 use esp_rs_copro_procmacro::{define_lp_allocator, load_lp_code2};
 
@@ -94,8 +90,8 @@ fn main() -> ! {
         #[cfg(feature = "esp32c6")]
         let wakeupsource = LpCoreWakeupSource::HpCpu;
         #[cfg(feature = "esp32s3")]
-        let wakeupsource = UlpCoreWakeupSource::HpCpu;
-        delay.delay_millis(1000);
+        let wakeupsource = UlpCoreWakeupSource::Timer(esp_hal::ulp_core::UlpCoreTimerCycles::new(200));
+        delay.delay_millis(1000); // FOR ESP32-S3 because the UART stuck after the HP core wake up without the delay.
         if let Err(e) = lp_core_code.run_light_sleep(&mut lp_core, wakeupsource, &mut Rtc::new(peripherals.LPWR), &mut parcel) {
             println!("Error running LP core: {}", e);
         }
