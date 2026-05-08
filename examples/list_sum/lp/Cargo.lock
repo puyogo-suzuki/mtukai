@@ -400,9 +400,9 @@ dependencies = [
 
 [[package]]
 name = "esp-hal"
-version = "1.1.0-rc.0"
+version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3599174af043c640b89d5950558bc40bd448f6e1d56ae43880a0d8530b4f82c"
+checksum = "2bfcf2a0842903717f4663f6a08512c32b0f6b2d7fb7db3c8a6895d2e6d49f72"
 dependencies = [
  "bitfield",
  "bitflags",
