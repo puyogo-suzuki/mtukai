@@ -84,15 +84,15 @@ unsafe extern "Rust" {
     pub(crate) fn get_lp_mem_begin_and_len() -> (usize, usize);
 }
 
-#[cfg(all(feature = "esp32c6", feature = "has-lp-core"))]
-const LP_ADDRESS_MAX : usize = LP_ADDRESS_BASE + LP_ADDRESS_LEN;
+// #[cfg(all(feature = "esp32c6", feature = "has-lp-core"))]
+// const LP_ADDRESS_MAX : usize = LP_ADDRESS_BASE + LP_ADDRESS_LEN;
 #[cfg(feature = "esp32c6")]
 const LP_ADDRESS_LEN : usize = 0x0004_0000;
 #[cfg(feature = "esp32c6")]
 const LP_ADDRESS_BASE : usize = 0x5000_0000;
 
-#[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]
-const LP_ADDRESS_MAX : usize = LP_ADDRESS_BASE + LP_ADDRESS_LEN;
+// #[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]
+// const LP_ADDRESS_MAX : usize = LP_ADDRESS_BASE + LP_ADDRESS_LEN;
 #[cfg(feature = "esp32s3")]
 const LP_ADDRESS_LEN : usize = 0x0002_0000;
 #[cfg(feature = "esp32s3")]

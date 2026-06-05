@@ -47,21 +47,24 @@ impl LPI2CError {
             }
         }
     }
-    #[cfg(feature = "has-lp-core")]
-    fn convert_from_result<T>(val : Result<T, esp_hal::i2c::lp_i2c::Error>) -> Result<T, LPI2CError> {
-        match val {
-            Ok(v) => Ok(v),
-            Err(e) => match e {
-                esp_hal::i2c::lp_i2c::Error::ExceedingFifo => Err(LPI2CError::ExceedingFifo),
-                esp_hal::i2c::lp_i2c::Error::AckCheckFailed => Err(LPI2CError::AckCheckFailed),
-                esp_hal::i2c::lp_i2c::Error::TimeOut => Err(LPI2CError::TimeOut),
-                esp_hal::i2c::lp_i2c::Error::ArbitrationLost => Err(LPI2CError::ArbitrationLost),
-                esp_hal::i2c::lp_i2c::Error::ExecIncomplete => Err(LPI2CError::ExecIncomplete),
-                esp_hal::i2c::lp_i2c::Error::CommandNrExceeded => Err(LPI2CError::CommandNrExceeded),
-                esp_hal::i2c::lp_i2c::Error::InvalidResponse => Err(LPI2CError::InvalidResponse),
-            }
-        }
-    }
+    // Currently, the main processor does not support I2C operations.
+    // Thus, to supress the compier unused warning, We comment this out.
+
+    // #[cfg(feature = "has-lp-core")]
+    // fn convert_from_result<T>(val : Result<T, esp_hal::i2c::lp_i2c::Error>) -> Result<T, LPI2CError> {
+    //     match val {
+    //         Ok(v) => Ok(v),
+    //         Err(e) => match e {
+    //             esp_hal::i2c::lp_i2c::Error::ExceedingFifo => Err(LPI2CError::ExceedingFifo),
+    //             esp_hal::i2c::lp_i2c::Error::AckCheckFailed => Err(LPI2CError::AckCheckFailed),
+    //             esp_hal::i2c::lp_i2c::Error::TimeOut => Err(LPI2CError::TimeOut),
+    //             esp_hal::i2c::lp_i2c::Error::ArbitrationLost => Err(LPI2CError::ArbitrationLost),
+    //             esp_hal::i2c::lp_i2c::Error::ExecIncomplete => Err(LPI2CError::ExecIncomplete),
+    //             esp_hal::i2c::lp_i2c::Error::CommandNrExceeded => Err(LPI2CError::CommandNrExceeded),
+    //             esp_hal::i2c::lp_i2c::Error::InvalidResponse => Err(LPI2CError::InvalidResponse),
+    //         }
+    //     }
+    // }
 }
 
 impl LPI2C {

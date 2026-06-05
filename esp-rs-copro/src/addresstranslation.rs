@@ -1,7 +1,7 @@
-use core::{alloc::Layout, mem, ptr};
+use core::{alloc::Layout/*, mem, ptr*/};
 
 #[cfg(feature = "nottest")]
-use ::alloc::{alloc, boxed::Box, collections::btree_map::BTreeMap};
+use ::alloc::{alloc, /*boxed::Box,*/ collections::btree_map::BTreeMap};
 #[cfg(not(feature = "nottest"))]
 use std::{alloc, collections::btree_map::BTreeMap};
 
@@ -81,9 +81,9 @@ impl AddressTranslationTable {
     }
 
     /// Get the main address and copy status by the LP address.
-    pub(crate) fn get_by_lp(&self, lp: usize) -> Option<&AddressTranslationEntry> {
-        self.lp_to_main.get(&lp)
-    }
+    // pub(crate) fn get_by_lp(&self, lp: usize) -> Option<&AddressTranslationEntry> {
+    //     self.lp_to_main.get(&lp)
+    // }
 
     // /// This must be called by LPRc and so on.
     // pub(crate) fn set_copied_by_lp(&mut self, lp: usize) -> Option<SetCopiedByLpResult>{

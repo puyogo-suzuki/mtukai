@@ -128,7 +128,8 @@
 #![cfg_attr(feature="nottest", no_std)]
 #![feature(layout_for_ptr)]
 #![feature(ptr_internals)]
-#![feature(ptr_as_ref_unchecked)] // Xtensa toolchain is old. Do not remove this.
+// Uncomment this, if your Xtensa toolchain is old.
+//#![feature(ptr_as_ref_unchecked)]
 #![feature(temporary_niche_types)]
 #![feature(sized_type_properties)]
 #![feature(rustc_attrs)]
@@ -162,9 +163,6 @@ pub mod collections;
 pub mod prelude;
 #[cfg(not(feature = "is-lp-core"))]
 mod addresstranslation;
-#[cfg(feature = "has-lp-core")]
-#[macro_use]
-extern crate esp_println;
 
 /// This represents an error that can occur during the transfer of a value between the main and the LP coprocessors.
 #[derive(Debug, Hash, Clone, Copy, Eq, PartialEq)]

@@ -59,6 +59,7 @@ impl<'d, const PIN: u8> MovableObject for LPInput<'d, PIN> {
 /// This struct is a movable object and can be transferred between the main core and the LP core.
 #[cfg(feature = "has-lp-core")]
 pub struct LPOutput<'d, const PIN: u8>  {
+    #[allow(unused)]
     inner: LowPowerOutput<'d, PIN>
 }
 /// A wrapper for low-power GPIO output pin that can be used in the LP core.
