@@ -1,4 +1,4 @@
-use core::{fmt::Debug, mem::{self, MaybeUninit}, ops::{Deref, DerefMut}, ptr::NonNull};
+use core::{fmt::Debug, mem::{self, MaybeUninit, SizedTypeProperties}, ops::{Deref, DerefMut}, ptr::NonNull};
 
 use crate::{EspCoproError, lpalloc::{self, address_translate_to_lp, address_translate_to_main, address_translate_to_main_const}, movableobject::MovableObject};
 #[cfg(feature = "nottest")]
@@ -165,34 +165,29 @@ impl<T: MovableObject> LPBox<T> {
     /// Create a new [`LPBox`] containing the given value.
     /// The value is allocated on the main memory on the main processor, and is allocated on the LP memory on the LP coprocessor.
     /// The ownership is transferred to the caller.
-    #[cfg(not(feature = "is-lp-core"))]
     pub fn new(value: T) -> Self { unsafe {
-        let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
-        ptr.write(value);
-        LPBox(NonNull::new_unchecked(ptr))
-    }}
-
-    /// Create a new [`LPBox`] containing the given value.
-    /// The value is allocated on the main memory on the main processor, and is allocated on the LP memory on the LP coprocessor.
-    /// The ownership is transferred to the caller.
-    #[cfg(feature = "is-lp-core")]
-    pub fn new(value: T) -> Self { unsafe {
-        let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
-        ptr.write(value);
-        #[cfg(feature = "unsafe-vtable")]
-        lpalloc::write_vtable(ptr as * mut u8, get_vtable(ptr.as_ref().unwrap()) as * mut u8);
-        LPBox(NonNull::new_unchecked(ptr))
+        if T::IS_ZST {
+            LPBox(NonNull::<T>::dangling())
+        } else {
+            let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
+            ptr.write(value);
+            #[cfg(all(feature = "unsafe-vtable", feature = "is-lp-core"))]
+            lpalloc::write_vtable(ptr as * mut u8, get_vtable(ptr.as_ref().unwrap()) as * mut u8);
+            LPBox(NonNull::new_unchecked(ptr))
+        }
     }}
 
     /// This is for testing. It creates a new [`LPBox`] containing the given value on the simulated LP heap.
     #[cfg(not(feature = "nottest"))]
-    pub unsafe fn new_lp(value: T) -> Self {
-        unsafe {
+    pub unsafe fn new_lp(value: T) -> Self { unsafe {
+        if T::IS_ZST {
+            LPBox(NonNull::<T>::dangling())
+        } else {
             let ptr = lpalloc::lp_allocator_alloc(core::alloc::Layout::for_value(&value)) as * mut T;
             ptr.write_volatile(value);
             LPBox(NonNull::new_unchecked(address_translate_to_lp(ptr)))
         }
-    }
+    }}
 }
 
 impl<T: MovableObject + Copy> LPBox<T> {
@@ -365,7 +360,9 @@ impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
         unsafe{self.as_mut_ptr().drop_in_place();}
         let ptr = self.as_ptr() as * mut u8;
         let lay = unsafe {core::alloc::Layout::for_value(self.0.as_ref())};
-        lp_dealloc(ptr, lay);
+        if lay.size() != 0 {
+            lp_dealloc(ptr, lay);
+        }
     }
     #[cfg(feature = "is-lp-core")]
     fn drop(&mut self) {
@@ -373,7 +370,9 @@ impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
         let lay = unsafe {core::alloc::Layout::for_value(self.0.as_ref())};
         if lpalloc::in_lp_mem_range(ptr) {
             unsafe{self.0.drop_in_place();}
-            unsafe{alloc::dealloc(ptr, lay);} // lp processor
+            if lay.size() != 0 {
+                unsafe{alloc::dealloc(ptr, lay);} // lp processor
+            }
         } else {
             // do not drop, as it is on the main coprocessor
         }
