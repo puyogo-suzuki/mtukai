@@ -678,32 +678,3 @@ impl<T: Ord + Copy> Ord for LPVecCopy<T> {
         Ord::cmp(&**self, &**other)
     }
 }
-
-struct SetLenOnDrop<'a> {
-    len: &'a mut usize,
-    local_len: usize,
-}
-
-impl<'a> SetLenOnDrop<'a> {
-    #[inline]
-    fn new(len: &'a mut usize) -> Self {
-        SetLenOnDrop { local_len: *len, len }
-    }
-
-    #[inline]
-    fn increment_len(&mut self, increment: usize) {
-        self.local_len += increment;
-    }
-
-    #[inline]
-    fn current_len(&self) -> usize {
-        self.local_len
-    }
-}
-
-impl Drop for SetLenOnDrop<'_> {
-    #[inline]
-    fn drop(&mut self) {
-        *self.len = self.local_len;
-    }
-}
