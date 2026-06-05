@@ -233,6 +233,29 @@ pub mod transfer_functions {
         }
     }
 
+    pub fn transfer_to_lp_copy<T : Copy>(src : &T) -> Result<*mut u8, EspCoproError> {
+        use crate::lpalloc;
+        use crate::lpbox::lpbox_static;
+        if core::mem::size_of::<T>() == 0 {
+            Ok(core::ptr::NonNull::<T>::dangling().as_ptr() as * mut u8)
+        } else {
+            if let Some(existing_lp_addr) = 
+                lpbox_static::get_by_main(src as *const T as * const () as usize) {
+                return Ok(existing_lp_addr as * mut u8);
+            }
+            unsafe { 
+                let ptr: *mut T = lpalloc::lp_allocator_alloc(core::alloc::Layout::for_value(src)) as * mut T;
+                if ptr.is_null() { return Err(EspCoproError::OutOfMemory); }
+                ptr.write_volatile(*src); // DO NOT DROP HERE!
+                // ptr.copy_from(src, layout.size());
+                // TODO: write_vtable
+                // lpalloc::write_vtable(ptr as * mut u8, get_vtable(src) as * mut u8);
+                lpbox_static::insert_no_drop(src as *const T as *mut T, ptr as usize);
+                Ok(lpalloc::address_translate_to_lp(ptr) as *mut u8)
+            }
+        }
+    }
+
     /// This is used in esp-rs-copro-procmacro.
     /// Transfers a value from the LP coprocessor to the main coprocessor.
     /// The value is moved, and the ownership is transferred to the main coprocessor.
@@ -250,14 +273,48 @@ pub mod transfer_functions {
             Err(EspCoproError::IncorrectlyTransferred)
         }
     }
+
+    pub unsafe fn transfer_to_main_copy<T: Copy>(src : *const u8, dst : &mut T) -> Result<(), EspCoproError> {
+        if core::mem::size_of::<T>() == 0 {
+            return Ok(());
+        }
+        if let Some(v) = unsafe{(crate::lpalloc::address_translate_to_main_const(src) as * const T).as_ref()} {
+            unsafe { (dst as *mut T).write_volatile(*v); } // DO NOT DROP HERE!
+            remove_by_main(dst as * mut T as usize);
+            cleanup();
+            Ok(())
+        } else {
+            Err(EspCoproError::IncorrectlyTransferred)
+        }
+    }
     
     /// This is used in mtukai-projgen-procmacro.
     /// Transfers a value from the LP coprocessor to the main coprocessor.
     /// The value is moved, and the ownership is transferred to the main coprocessor.
     /// The caller must ensure that the value is not used on the LP coprocessor after this function is called.
     pub unsafe fn transfer_to_main_sub<T : MovableObject>(src : * const u8, dst : &mut T) -> Result<(), EspCoproError> {
+        if core::mem::size_of::<T>() == 0 {
+            return Ok(());
+        }
         if let Some(v) = unsafe{(crate::lpalloc::address_translate_to_main_const(src) as * const T).as_ref()} {
             unsafe{v.move_to_main(dst as * mut T as * mut u8)?;}
+            remove_by_main(dst as * mut T as usize);
+            Ok(())
+        } else {
+            Err(EspCoproError::IncorrectlyTransferred)
+        }
+    }
+
+    /// This is used in mtukai-projgen-procmacro.
+    /// Transfers a value from the LP coprocessor to the main coprocessor.
+    /// The value is moved, and the ownership is transferred to the main coprocessor.
+    /// The caller must ensure that the value is not used on the LP coprocessor after this function is called.
+    pub unsafe fn transfer_to_main_sub_copy<T : Copy>(src : * const u8, dst : &mut T) -> Result<(), EspCoproError> {
+        if core::mem::size_of::<T>() == 0 {
+            return Ok(());
+        }
+        if let Some(v) = unsafe{(crate::lpalloc::address_translate_to_main_const(src) as * const T).as_ref()} {
+            unsafe { (dst as *mut T).write_volatile(*v); } // DO NOT DROP HERE!
             remove_by_main(dst as * mut T as usize);
             Ok(())
         } else {
