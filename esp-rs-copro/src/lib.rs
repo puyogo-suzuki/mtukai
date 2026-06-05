@@ -226,7 +226,11 @@ pub mod transfer_functions {
     /// The value is moved, and the ownership is transferred to the LP coprocessor.
     /// The caller must ensure that the value is not used on the main coprocessor after this function is called.
     pub fn transfer_to_lp<T : MovableObject>(src : &T) -> Result<*mut u8, EspCoproError> {
-        LPBox::<T>::write_to_lp(src).map(|ptr| crate::lpalloc::address_translate_to_lp(ptr))
+        if core::mem::size_of::<T>() == 0 {
+            Ok(core::ptr::NonNull::<T>::dangling().as_ptr() as * mut u8)
+        } else {
+            LPBox::<T>::write_to_lp(src).map(|ptr| crate::lpalloc::address_translate_to_lp(ptr))
+        }
     }
 
     /// This is used in esp-rs-copro-procmacro.
@@ -234,10 +238,27 @@ pub mod transfer_functions {
     /// The value is moved, and the ownership is transferred to the main coprocessor.
     /// The caller must ensure that the value is not used on the LP coprocessor after this function is called.
     pub unsafe fn transfer_to_main<T : MovableObject>(src : * const u8, dst : &mut T) -> Result<(), EspCoproError> {
+        if core::mem::size_of::<T>() == 0 {
+            return Ok(());
+        }
         if let Some(v) = unsafe{(crate::lpalloc::address_translate_to_main_const(src) as * const T).as_ref()} {
             unsafe{v.move_to_main(dst as * mut T as * mut u8)?;}
             remove_by_main(dst as * mut T as usize);
             cleanup();
+            Ok(())
+        } else {
+            Err(EspCoproError::IncorrectlyTransferred)
+        }
+    }
+    
+    /// This is used in mtukai-projgen-procmacro.
+    /// Transfers a value from the LP coprocessor to the main coprocessor.
+    /// The value is moved, and the ownership is transferred to the main coprocessor.
+    /// The caller must ensure that the value is not used on the LP coprocessor after this function is called.
+    pub unsafe fn transfer_to_main_sub<T : MovableObject>(src : * const u8, dst : &mut T) -> Result<(), EspCoproError> {
+        if let Some(v) = unsafe{(crate::lpalloc::address_translate_to_main_const(src) as * const T).as_ref()} {
+            unsafe{v.move_to_main(dst as * mut T as * mut u8)?;}
+            remove_by_main(dst as * mut T as usize);
             Ok(())
         } else {
             Err(EspCoproError::IncorrectlyTransferred)
