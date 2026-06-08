@@ -9,7 +9,6 @@
 use esp_alloc as _;
 use esp_hal::{
     rtc_cntl::Rtc,
-    gpio::lp_io::LowPowerOutput,
     lp_core::{LpCore, LpCoreWakeupSource},
 };
 use esp_println::println;
