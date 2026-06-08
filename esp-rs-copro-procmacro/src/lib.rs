@@ -209,7 +209,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     
     let copro_crate_use = if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-rs-copro") {
         let ident = Ident::new(name, Span::call_site().into());
-        quote!{ use #ident ::{ transfer_functions::*, lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject, EspCoproError, try_copro_lock, copro_unlock}; }
+        quote!{ use #ident ::{ lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject, movableobjectwrapper::*, EspCoproError, try_copro_lock, copro_unlock}; }
     } else { quote!{} };
 
     let args: LoadLpArgs = match syn::parse(input) {
@@ -352,10 +352,10 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                         }
                     };
                 }
-                let trans = transfer_to_lp(transfer_value)?;
+                let trans = transfer_value.wrap_transfer_to_lp()?;
                 unsafe {((#a) as *mut *mut u8).write_volatile(trans);}
             },
-            quote!{unsafe { transfer_to_main(((#a) as *mut *mut u8).read_volatile(), transfer_value)? } })
+            quote!{unsafe { transfer_value.wrap_transfer_to_main(((#a) as *mut *mut u8).read_volatile())? } })
         } else { (quote! {}, quote! {})};
     let allocsym = obj_file.symbols().find(|s| s.name().map_or(false, |v| v.starts_with("__COPRO_ALLOCATOR_")));
     let allocfun = if let Some(a) = allocsym {
