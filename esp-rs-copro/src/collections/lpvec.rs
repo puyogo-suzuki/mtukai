@@ -3,7 +3,7 @@
 /// Copyright (c) The Rust Project Contributors.
 /// https://github.com/rust-lang/rust
 
-use core::{alloc::Layout, slice, fmt, intrinsics, iter, marker::PhantomData, mem::{self, ManuallyDrop, MaybeUninit, SizedTypeProperties}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull, Unique}, slice::SliceIndex};
+use core::{alloc::Layout, slice, fmt, iter, marker::PhantomData, mem::{self, ManuallyDrop, MaybeUninit, SizedTypeProperties}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull, Unique}, slice::SliceIndex};
 use crate::{EspCoproError, lpadapter::LPAdapter, lpalloc::{address_translate_to_lp, address_translate_to_main}, lpbox::LPBox, movableobject::MovableObject, collections::lpdrain::LPDrain};
 
 #[cfg(feature = "nottest")]
@@ -36,7 +36,7 @@ pub struct LPVec<T : MovableObject> {
     _marker : PhantomData<T>
 }
 
-struct LPVecInner {
+pub(crate) struct LPVecInner {
     ptr : Unique<u8>,
     capacity : Cap
 }
@@ -730,7 +730,8 @@ impl<T : MovableObject> LPVec<T> {
     }
 
     pub const fn len(&self) -> usize {
-        unsafe { intrinsics::assume(self.len <= T::MAX_SLICE_LEN) };
+        // Requires #![feature(core_intrinsics)] 
+        // unsafe { intrinsics::assume(self.len <= T::MAX_SLICE_LEN) };
         self.len
     }
 

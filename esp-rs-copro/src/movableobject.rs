@@ -1,4 +1,4 @@
-use core::{intrinsics::copy_nonoverlapping, mem::MaybeUninit};
+use core::{ptr::copy_nonoverlapping, mem::MaybeUninit};
 use crate::EspCoproError;
 
 /// A trait for objects that can be moved between the main memory and the LP memory.

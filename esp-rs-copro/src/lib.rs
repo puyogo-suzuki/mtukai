@@ -133,7 +133,6 @@
 #![feature(rustc_attrs)]
 #![feature(const_trait_impl)]
 #![feature(const_default)]
-#![feature(core_intrinsics)]
 #![feature(slice_range)]
 #![feature(specialization)]
 #![feature(cast_maybe_uninit)]
