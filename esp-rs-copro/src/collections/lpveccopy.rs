@@ -3,8 +3,8 @@
 /// Copyright (c) The Rust Project Contributors.
 /// https://github.com/rust-lang/rust
 
-use core::{slice, fmt, iter, mem::{ManuallyDrop, MaybeUninit}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull}, slice::SliceIndex};
-use crate::{collections::lpvec::{ExtendFromWithinSpec, LPTryReserveError, LPVec, SpecExtend}, lpadapter::{LPAdapter, LPAdapterSliceConvert}, lpbox::LPBox, movableobject::MovableObject, EspCoproError};
+use core::{slice, fmt, mem::{ManuallyDrop, MaybeUninit}, ops::{Index, IndexMut, RangeBounds}, ptr::{self, NonNull}, slice::SliceIndex};
+use crate::{collections::lpvec::{LPTryReserveError, LPVec}, lpadapter::{LPAdapter, LPAdapterSliceConvert}, lpbox::LPBox, movableobject::MovableObject, EspCoproError};
 
 #[cfg(feature = "nottest")]
 use ::alloc::{boxed::Box, vec::Vec};
@@ -205,11 +205,6 @@ impl<T : Copy> LPVecCopy<T> {
         self.vec_inner.append(&mut other.vec_inner);
     }
 
-    #[inline]
-    unsafe fn append_elements(&mut self, other: *const [T]) {
-        unsafe { self.vec_inner.append_elements(other as * const [LPAdapter<T>]) };
-    }
-    
     // pub fn drain<R>(&mut self, range: R) -> Drain<'_, T, A>
     // where
     //     R: RangeBounds<usize>,
@@ -316,7 +311,7 @@ impl<T : Copy> LPVecCopy<T> {
     }
 
     pub fn extend_from_slice(&mut self, other: &[T]) {
-        self.spec_extend(other.iter());
+        self.vec_inner.extend_from_slice(other.cast_lp_adapter());
     }
 
     pub fn extend_from_within<R>(&mut self, src: R)
@@ -324,47 +319,6 @@ impl<T : Copy> LPVecCopy<T> {
         R: RangeBounds<usize>,
     {
         self.vec_inner.extend_from_within(src);
-    }
-    
-    unsafe fn spec_extend_from_within(&mut self, src: Range<usize>) {
-        unsafe { self.vec_inner.spec_extend_from_within(src); }
-    }
-}
-
-impl<T : Copy, I> SpecExtend<T, I> for LPVecCopy<T>
-where
-    I: Iterator<Item = T>,
-{
-    default fn spec_extend(&mut self, iter: I) {
-        self.vec_inner.spec_extend(iter.map(|v| LPAdapter::new(v)));
-    }
-}
-
-impl<T: Copy, I> SpecExtend<T, I> for LPVecCopy<T>
-where
-    I: iter::TrustedLen<Item = T>,
-{
-    default fn spec_extend(&mut self, iterator: I) {
-        self.vec_inner.spec_extend(iterator.map(|v| LPAdapter::new(v)));
-    }
-}
-
-// impl<T: MovableObject> SpecExtend<T, IntoIter<T>> for LPVec<T> {
-//     fn spec_extend(&mut self, mut iterator: IntoIter<T>) {
-//         unsafe {
-//             self.append_elements(iterator.as_slice() as _);
-//         }
-//         iterator.forget_remaining_elements();
-//     }
-// }
-
-impl<'a, T: 'a> SpecExtend<&'a T, slice::Iter<'a, T>> for LPVecCopy<T>
-where
-    T: Copy,
-{
-    fn spec_extend(&mut self, iterator: slice::Iter<'a, T>) {
-        let slice = iterator.as_slice();
-        unsafe { self.append_elements(slice) };
     }
 }
 
