@@ -128,8 +128,6 @@
 #![cfg_attr(feature="nottest", no_std)]
 #![feature(layout_for_ptr)]
 #![feature(ptr_internals)]
-// Uncomment this, if your Xtensa toolchain is old.
-//#![feature(ptr_as_ref_unchecked)]
 #![feature(temporary_niche_types)]
 #![feature(sized_type_properties)]
 #![feature(rustc_attrs)]
@@ -138,7 +136,6 @@
 #![feature(core_intrinsics)]
 #![feature(slice_range)]
 #![feature(specialization)]
-#![feature(new_range_api)]
 #![feature(cast_maybe_uninit)]
 #![feature(trusted_len)]
 #![feature(exact_size_is_empty)]
