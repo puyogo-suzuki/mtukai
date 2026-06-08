@@ -14,6 +14,12 @@ impl<T: Copy> LPAdapter<T> {
     pub fn new(inner: T) -> Self {
         Self { inner }
     }
+    pub fn as_lpadapter(inner : &T) -> &LPAdapter<T> {
+        unsafe { &*(inner as *const T as *const LPAdapter<T>) }
+    }
+    pub fn as_lpadapter_mut(inner : &mut T) -> &mut LPAdapter<T> {
+        unsafe { &mut *(inner as *mut T as *mut LPAdapter<T>) }
+    }
 }
 
 /// This trait allows for converting between slices of `T` and slices of [`LPAdapter<T>`].
