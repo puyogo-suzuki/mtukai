@@ -1,4 +1,7 @@
-use super::movableobject::MovableObject;
+use crate::{
+    movableobject::MovableObject,
+    lpadapter::LPAdapter
+};
 
 #[doc(hidden)]
 pub trait MovableObjectWrapFallback {
@@ -23,15 +26,15 @@ impl<T: Copy> MovableObjectWrapFallback for T {
     }
     #[cfg(feature = "has-lp-core")]
     fn wrap_transfer_to_lp(&self) -> Result<*mut u8, crate::EspCoproError> {
-        crate::transfer_functions::transfer_to_lp_copy(self)
+        crate::transfer_functions::transfer_to_lp(LPAdapter::as_lpadapter(self))
     }
     #[cfg(feature = "has-lp-core")]
     unsafe fn wrap_transfer_to_main(&mut self, src : * const u8) -> Result<(), crate::EspCoproError> {
-        unsafe{ crate::transfer_functions::transfer_to_main_copy(src, self) }
+        unsafe{ crate::transfer_functions::transfer_to_main(src, LPAdapter::as_lpadapter_mut(self)) }
     }
     #[cfg(feature = "has-lp-core")]
     unsafe fn wrap_transfer_to_main_sub(&mut self, src : * const u8) -> Result<(), crate::EspCoproError> {
-        unsafe { crate::transfer_functions::transfer_to_main_sub_copy(src, self) }
+        unsafe { crate::transfer_functions::transfer_to_main_sub(src, LPAdapter::as_lpadapter_mut(self)) }
     }
 }
 
