@@ -5,6 +5,25 @@ use ::alloc::{alloc, /*boxed::Box,*/ collections::btree_map::BTreeMap};
 #[cfg(not(feature = "nottest"))]
 use std::{alloc, collections::btree_map::BTreeMap};
 
+/*
+  Implmentation memo:
+  About drop:
+    I have prepared Droppable for the structs implementing Drop.
+    However, I found that it is difficult to enable/disable drop on the LP coprocessor.
+    (Should I add a 'transferred' bit to LPBox<T>?)
+    Therefore, I decided always to drop the values on the LP coprocessor, if the processor has the pointee and the pointee needs drop.
+  About Rc<T>:
+    It is expected to add RcRef { main_rc: usize, lp_rc: usize, layout } to the translation table.
+    When LPRc<T> is cloned first, the main_rc would be LPRc.refcount and lp_rc would be 1.
+    When LPRc<T> is cloned later, lp_rc would be incremented.
+    After LP coprocessor finishes:
+    When LPRc<T> is met, the main_rc would be updated and do not drop.
+    When not:
+      If lp_rc == main_rc, drop the value.
+      If lp_rc != main_rc, do not drop the value, just update the original refcount to main_rc - lp_rc.
+    copied must be checked when copying.
+*/
+
 // /// The combination of copy status and the address on the main memory.
 // /// This is used for the return value of [`AddressTranslationTable::set_copied_by_lp`].
 // pub(crate) struct SetCopiedByLpResult {
@@ -38,7 +57,7 @@ impl AddressTranslationAddressValue {
 /// The address translation item, which contains the address translation and the copy status.
 pub(crate) struct AddressTranslationEntry {
     pub address : AddressTranslationAddressValue,
-    pub copied : bool
+    // pub copied : bool
 }
 /// The address translation table, which manages the translation between main and LP addresses.
 pub(crate) struct AddressTranslationTable {
@@ -63,7 +82,7 @@ impl AddressTranslationTable {
         //     let foo = |v : *mut u8| unsafe{ptr::drop_in_place(v as *mut T)};
         //     self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::Droppable(main as usize, Box::new(foo)), copied: false });
         // } else {
-            self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::NonDroppable(main as *mut () as usize, unsafe{Layout::for_value_raw(main)}), copied: false });
+            self.lp_to_main.insert(lp, AddressTranslationEntry { address: AddressTranslationAddressValue::NonDroppable(main as *mut () as usize, unsafe{Layout::for_value_raw(main)}) /*, copied: false */ });
         // }
     }
 
