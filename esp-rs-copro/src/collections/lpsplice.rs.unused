@@ -1,5 +1,6 @@
 use core::ptr::{self};
 use core::slice::{self};
+use core::mem::SizedTypeProperties;
 
 use crate::movableobject::MovableObject;
 
@@ -64,7 +65,7 @@ impl<I: Iterator> Drop for LPSplice<'_, I> where <I as Iterator>::Item: MovableO
 
             // Collect any remaining elements.
             // This is a zero-length vector which does not allocate if `lower_bound` was exact.
-            let mut collected = self.replace_with.by_ref().collect::<Vec<I::Item>>().into_iter();
+            let mut collected = self.replace_with.by_ref().collect::<LPVec<I::Item>>().into_iter();
             // Now we have an exact count.
             if collected.len() > 0 {
                 self.drain.move_tail(collected.len());
@@ -105,7 +106,7 @@ impl<T : MovableObject> LPDrain<'_, T> {
     unsafe fn move_tail(&mut self, additional: usize) {
         let vec = unsafe { self.vec.as_mut() };
         let len = self.tail_start + self.tail_len;
-        vec.vec_inner.grow_or_shrink(len, additional).unwrap();
+        vec.vec_inner.grow_or_shrink(len + additional, T::LAYOUT).unwrap();
 
         let new_tail_start = self.tail_start + additional;
         unsafe {

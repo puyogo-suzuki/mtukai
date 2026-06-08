@@ -4,7 +4,7 @@
 /// https://github.com/rust-lang/rust
 
 use core::{alloc::Layout, slice, fmt, intrinsics, iter, marker::PhantomData, mem::{self, ManuallyDrop, MaybeUninit, SizedTypeProperties}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull, Unique}, slice::SliceIndex};
-use crate::{EspCoproError, lpadapter::LPAdapter, lpalloc::{address_translate_to_lp, address_translate_to_main}, lpbox::LPBox, movableobject::MovableObject};
+use crate::{EspCoproError, lpadapter::LPAdapter, lpalloc::{address_translate_to_lp, address_translate_to_main}, lpbox::LPBox, movableobject::MovableObject, collections::lpdrain::LPDrain};
 
 #[cfg(feature = "nottest")]
 use ::alloc::{alloc, boxed::Box, vec::Vec};
@@ -31,8 +31,8 @@ type Cap = core::num::niche_types::UsizeNoHighBit;
 /// Copyright (c) The Rust Project Contributors.
 /// <https://github.com/rust-lang/rust>
 pub struct LPVec<T : MovableObject> {
-    vec_inner : LPVecInner,
-    len : usize,
+    pub(crate) vec_inner : LPVecInner,
+    pub(crate) len : usize,
     _marker : PhantomData<T>
 }
 
@@ -613,25 +613,25 @@ impl<T : MovableObject> LPVec<T> {
         self.len += count;
     }
     
-    // pub fn drain<R>(&mut self, range: R) -> Drain<'_, T, A>
-    // where
-    //     R: RangeBounds<usize>,
-    // {
-    //     let len = self.len();
-    //     let Range { start, end } = slice::range(range, ..len);
+    pub fn drain<R>(&mut self, range: R) -> LPDrain<'_, T>
+    where
+        R: RangeBounds<usize>,
+    {
+        let len = self.len();
+        let Range { start, end } = slice::range(range, ..len);
 
-    //     unsafe {
-    //         // set self.vec length's to start, to be safe in case Drain is leaked
-    //         self.set_len(start);
-    //         let range_slice = slice::from_raw_parts(self.as_ptr().add(start), end - start);
-    //         Drain {
-    //             tail_start: end,
-    //             tail_len: len - end,
-    //             iter: range_slice.iter(),
-    //             vec: NonNull::from(self),
-    //         }
-    //     }
-    // }
+        unsafe {
+            // set self.vec length's to start, to be safe in case Drain is leaked
+            self.set_len(start);
+            let range_slice = slice::from_raw_parts(self.as_ptr().add(start), end - start);
+            LPDrain {
+                tail_start: end,
+                tail_len: len - end,
+                iter: range_slice.iter(),
+                vec: NonNull::from(self),
+            }
+        }
+    }
 
     #[inline]
     pub fn clear(&mut self) {
@@ -785,12 +785,12 @@ impl<T : MovableObject> LPVec<T> {
     }
 
     // #[inline]
-    // pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>
+    // pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> LPSplice<'_, I::IntoIter>
     // where
     //     R: RangeBounds<usize>,
     //     I: IntoIterator<Item = T>,
     // {
-    //     Splice { drain: self.drain(range), replace_with: replace_with.into_iter() }
+    //     LPSplice { drain: self.drain(range), replace_with: replace_with.into_iter() }
     // }
 
     // pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_, T, F, A>
@@ -856,6 +856,35 @@ impl<T: Clone + MovableObject> LPVec<T> {
             // len set by scope guard
         }
     }
+}
+
+impl<T : MovableObject> Extend<T> for LPVec<T> {
+    #[inline]
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        <Self as SpecExtend<T, I::IntoIter>>::spec_extend(self, iter.into_iter())
+    }
+
+    // This seems unstable.
+    // #[inline]
+    // fn extend_one(&mut self, item: T) {
+    //     self.push(item);
+    // }
+
+    // This seems unstable.
+    // #[inline]
+    // fn extend_reserve(&mut self, additional: usize) {
+    //     self.reserve(additional);
+    // }
+
+    // This seems unstable.
+    // #[inline]
+    // unsafe fn extend_one_unchecked(&mut self, item: T) {
+    //     unsafe {
+    //         let len = self.len();
+    //         ptr::write(self.as_mut_ptr().add(len), item);
+    //         self.set_len(len + 1);
+    //     }
+    // }
 }
 
 pub(crate) trait ExtendFromWithinSpec {

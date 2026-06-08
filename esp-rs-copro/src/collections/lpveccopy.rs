@@ -4,7 +4,7 @@
 /// https://github.com/rust-lang/rust
 
 use core::{slice, fmt, mem::{ManuallyDrop, MaybeUninit}, ops::{Index, IndexMut, RangeBounds}, ptr::{self, NonNull}, slice::SliceIndex};
-use crate::{collections::lpvec::{LPTryReserveError, LPVec}, lpadapter::{LPAdapter, LPAdapterSliceConvert}, lpbox::LPBox, movableobject::MovableObject, EspCoproError};
+use crate::{collections::{lpvec::{LPTryReserveError, LPVec}, lpdrain::LPDrain}, lpadapter::{LPAdapter, LPAdapterSliceConvert}, lpbox::LPBox, movableobject::MovableObject, EspCoproError};
 
 #[cfg(feature = "nottest")]
 use ::alloc::{boxed::Box, vec::Vec};
@@ -205,25 +205,12 @@ impl<T : Copy> LPVecCopy<T> {
         self.vec_inner.append(&mut other.vec_inner);
     }
 
-    // pub fn drain<R>(&mut self, range: R) -> Drain<'_, T, A>
-    // where
-    //     R: RangeBounds<usize>,
-    // {
-    //     let len = self.len();
-    //     let Range { start, end } = slice::range(range, ..len);
-
-    //     unsafe {
-    //         // set self.vec length's to start, to be safe in case Drain is leaked
-    //         self.set_len(start);
-    //         let range_slice = slice::from_raw_parts(self.as_ptr().add(start), end - start);
-    //         Drain {
-    //             tail_start: end,
-    //             tail_len: len - end,
-    //             iter: range_slice.iter(),
-    //             vec: NonNull::from(self),
-    //         }
-    //     }
-    // }
+    pub fn drain<R>(&mut self, range: R) -> LPDrain<'_, LPAdapter<T>>
+    where
+        R: RangeBounds<usize>,
+    {
+        self.vec_inner.drain(range)
+    }
 
     #[inline]
     pub fn clear(&mut self) {
@@ -290,12 +277,12 @@ impl<T : Copy> LPVecCopy<T> {
     }
 
     // #[inline]
-    // pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> Splice<'_, I::IntoIter>
+    // pub fn splice<R, I>(&mut self, range: R, replace_with: I) -> LPSplice<'_, I::IntoIter>
     // where
     //     R: RangeBounds<usize>,
-    //     I: IntoIterator<Item = T>,
+    //     I: IntoIterator<Item = LPAdapter<T>>,
     // {
-    //     Splice { drain: self.drain(range), replace_with: replace_with.into_iter() }
+    //     LPSplice { drain: self.drain(range), replace_with: replace_with.into_iter() }
     // }
 
     // pub fn extract_if<F, R>(&mut self, range: R, filter: F) -> ExtractIf<'_, T, F, A>
