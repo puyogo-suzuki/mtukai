@@ -1,7 +1,6 @@
 #![no_std]
 
-use core::option::Option;
-use esp_rs_copro::{io::{i2c::LPI2C, gpio::LPInput}, collections::lpvec::LPVec};
+use esp_rs_copro::io::{i2c::LPI2C, gpio::LPInput};
 
 #[derive(Clone, Copy, esp_rs_copro_procmacro::MovableObject)]
 pub struct Vector3D {

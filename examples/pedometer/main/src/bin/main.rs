@@ -12,7 +12,6 @@ use esp_hal::i2c::lp_i2c::LpI2c;
 use esp_hal::peripherals::{LP_IO};
 use esp_hal::rtc_cntl::Rtc;
 use esp_hal::time::Rate;
-use esp_hal::delay::Delay;
 use esp_hal::lp_core::{LpCore, LpCoreWakeupSource};
 
 use esp_rs_copro::io::{i2c::LPI2C, gpio::LPInput};
