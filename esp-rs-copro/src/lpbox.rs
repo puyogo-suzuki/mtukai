@@ -1,5 +1,6 @@
-use core::{fmt::Debug, mem::{self, MaybeUninit, SizedTypeProperties}, ops::{Deref, DerefMut}, ptr::NonNull, num::NonZero, borrow::{BorrowMut, Borrow}};
-
+use core::{fmt::Debug, mem::{self, MaybeUninit, SizedTypeProperties}, ops::{Deref, DerefMut}, ptr::NonNull, borrow::{BorrowMut, Borrow}};
+#[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
+use core::num::NonZero;
 use crate::{EspCoproError, lpalloc::{self, address_translate_to_lp, address_translate_to_main}, movableobject::MovableObject};
 #[cfg(feature = "nottest")]
 use alloc::alloc;
