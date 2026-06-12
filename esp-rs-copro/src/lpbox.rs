@@ -1,4 +1,4 @@
-use core::{fmt::Debug, mem::{self, MaybeUninit, SizedTypeProperties}, ops::{Deref, DerefMut}, ptr::NonNull};
+use core::{fmt::Debug, mem::{self, MaybeUninit, SizedTypeProperties}, ops::{Deref, DerefMut}, ptr::NonNull, num::NonZero, borrow::{BorrowMut, Borrow}};
 
 use crate::{EspCoproError, lpalloc::{self, address_translate_to_lp, address_translate_to_main, address_translate_to_main_const}, movableobject::MovableObject};
 #[cfg(feature = "nottest")]
@@ -342,6 +342,18 @@ impl<T : ?Sized + MovableObject> Deref for LPBox<T> {
 impl<T : ?Sized + MovableObject> DerefMut for LPBox<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { address_translate_to_main(self.0.as_ptr()).as_mut_unchecked() }
+    }
+}
+
+impl<T: ?Sized + MovableObject> Borrow<T> for LPBox<T> {
+    fn borrow(&self) -> &T {
+        &**self
+    }
+}
+
+impl<T: ?Sized + MovableObject> BorrowMut<T> for LPBox<T> {
+    fn borrow_mut(&mut self) -> &mut T {
+        &mut **self
     }
 }
 
