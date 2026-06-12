@@ -18,7 +18,13 @@ impl<T: Copy> LPAdapter<T> {
         unsafe { &*(inner as *const T as *const LPAdapter<T>) }
     }
     pub fn as_lpadapter_mut(inner : &mut T) -> &mut LPAdapter<T> {
-        unsafe { &mut *(inner as *mut T as *mut LPAdapter<T>) }
+        unsafe { &mut *(inner as *mut T as *mut  LPAdapter<T>) }
+    }
+    pub fn as_inner_ref(&self) -> &T {
+        &self.inner
+    }
+    pub fn as_inner_mut(&mut self) -> &mut T {
+        &mut self.inner
     }
 }
 

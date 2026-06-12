@@ -1,6 +1,6 @@
 use core::{fmt::Debug, mem::{self, MaybeUninit, SizedTypeProperties}, ops::{Deref, DerefMut}, ptr::NonNull, num::NonZero, borrow::{BorrowMut, Borrow}};
 
-use crate::{EspCoproError, lpalloc::{self, address_translate_to_lp, address_translate_to_main, address_translate_to_main_const}, movableobject::MovableObject};
+use crate::{EspCoproError, lpalloc::{self, address_translate_to_lp, address_translate_to_main}, movableobject::MovableObject};
 #[cfg(feature = "nottest")]
 use alloc::alloc;
 #[cfg(feature = "nottest")]
@@ -223,7 +223,7 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     /// The value is not moved.
     /// The ownership is not transferred, and the caller must ensure that the value is not dropped while using the pointer.
     pub fn as_ptr(&self) -> * const T {
-        address_translate_to_main_const(self.as_ptr_without_translation())
+        address_translate_to_main(self.0.as_ptr()) as * const T
     }
 
     /// Convert an [`LPBox`] into a raw pointer. The value is not moved, and the caller takes ownership of the memory.
@@ -255,10 +255,10 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     /// 
     /// TODO: Must be moved to the other implementation. This is because Box<T> is single-owner, thus it is not possible that the pointee has already moved.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
-    pub(crate) fn write_to_lp(value : &T) -> Result<* mut u8, EspCoproError> { unsafe {
+    pub(crate) fn write_to_lp(value : &T) -> Result<NonNull<T>, EspCoproError> { unsafe {
         if let Some(existing_lp_addr) = 
             lpbox_static::get_by_main(value as *const T as * const () as usize) {
-            return Ok(existing_lp_addr as * mut u8);
+            return Ok(NonNull::from_ref(value).with_addr(NonZero::new_unchecked(existing_lp_addr as usize)));
         }
         let ptr: *mut u8 = lpalloc::lp_allocator_alloc(core::alloc::Layout::for_value(value)) as * mut u8;
         if ptr.is_null() { return Err(EspCoproError::OutOfMemory); }
@@ -266,21 +266,22 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
         // ptr.copy_from(value, layout.size());
         // TODO: write_vtable
         // lpalloc::write_vtable(ptr as * mut u8, get_vtable(value) as * mut u8);
-        lpbox_static::insert_no_drop(value as *const T as *mut T, ptr as usize);
-        Ok(ptr)
+        let ptr = ptr as usize;
+        lpbox_static::insert_no_drop(value as *const T as *mut T, ptr);
+        Ok(NonNull::from_ref(value).with_addr(NonZero::new_unchecked(ptr)))
     }}
 
     /// This is for internal-use.
     /// Returns a reference to the value. The value is moved to the main memory.
     /// If the value is already in the main memory, the value on the main memory is overwritten.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
-    fn write_to_main(value : &T) -> Result<* mut u8, EspCoproError> { unsafe {
+    fn write_to_main(value : &T) -> Result<NonNull<T>, EspCoproError> { unsafe {
         let addr =
             lpbox_static::remove_by_lp(value as * const T as * const () as usize)
                 .map_or_else(|| lpbox_alloc(core::alloc::Layout::for_value(value)) as usize,
                     |a| a.0);
         value.move_to_main(addr as * mut u8)?;
-        Ok(addr as * mut u8)
+        Ok(NonNull::from_ref(value).with_addr(NonZero::new_unchecked(addr)))
     }}
 
     /// This is for internal-use.
@@ -288,14 +289,15 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     /// If the value is already in the LP memory, it is not moved again.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub unsafe fn get_moved_to_lp(&self) -> Result<LPBox<T>, EspCoproError> {
-        unsafe { Ok(LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(address_translate_to_lp(Self::write_to_lp(self.0.as_ref())?) as usize))) )}
+        use crate::lpalloc::address_translate_to_lp_nonnull;
+        unsafe{ Ok(LPBox(address_translate_to_lp_nonnull(Self::write_to_lp(self.0.as_ref())?))) }
     }
     /// This is for internal-use.
     /// Returns a reference to the moved value. The value is moved to the main memory.
     /// If the value is already in the main memory, the value on the main memory is overwritten.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub unsafe fn get_moved_to_main(&self) -> Result<LPBox<T>, EspCoproError> {
-        unsafe { Ok(LPBox(self.0.with_addr(core::num::NonZero::new_unchecked(Self::write_to_main(address_translate_to_main(self.0.as_ptr()).as_ref_unchecked())? as usize))) )}
+        unsafe { Ok(LPBox(self.0.with_addr(NonZero::new_unchecked((Self::write_to_main(address_translate_to_main(self.0.as_ptr()).as_ref_unchecked())?).as_ptr() as * mut () as usize))) )}
     }
     // call the main processor's function.
     // #[cfg(feature = "is-lp-core")]

@@ -49,13 +49,17 @@ pub fn esp_rs_copro_statics(_attr: TokenStream) -> TokenStream {
     let export_name_lit = Literal::string(&export_name);
     let expanded = quote! {
         #[unsafe(export_name="__COPRO_TRANSFER")]
-        static mut TRANSFER : *mut u8 = 0 as * mut u8;
+        static mut TRANSFER : [usize; 2] = [0; 2];
         #[used]
         #[unsafe(export_name=#export_name_lit)]
         static mut allocator : #copro_crate::lpalloc::ImplLPAllocator<#heap_size> = #copro_crate::lpalloc::ImplLPAllocator::new();
-        fn get_transfer<T : #copro_crate::movableobject::MovableObject>() -> Option<&'static mut T> {
+        fn get_transfer<T : #copro_crate::movableobject::MovableObject + ?Sized>() -> Option<&'static mut T> {
+            use core::ptr::NonNull;
+            if size_of::<[usize; 2]>() < size_of::<NonNull<T>>() {
+                return None;
+            }
             if(unsafe{!allocator.free_ptr.get().is_null()}) {
-                Some(unsafe { &mut *(TRANSFER as * mut T) })
+                Some(unsafe { (*(TRANSFER.as_ptr() as * mut NonNull<T>)).as_mut() })
             } else {
                 None
             }
@@ -193,14 +197,9 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
             })
         }
     }
-
-    let hal_crate = if cfg!(feature = "is-lp-core") {
-        crate_name("esp-lp-hal")
-    } else {
-        crate_name("esp-hal")
-    };
     
-    let hal_crate = if let Ok(FoundCrate::Name(ref name)) = hal_crate {
+    let hal_crate = if let Ok(FoundCrate::Name(ref name)) = crate_name(
+    if cfg!(feature = "is-lp-core") {"esp-lp-hal" } else { "esp-hal" }) {
         let ident = Ident::new(name, Span::call_site().into());
         quote!( #ident )
     } else {
@@ -352,10 +351,14 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                         }
                     };
                 }
+                use core::ptr::NonNull;
+                if size_of::<[usize; 2]>() < size_of::<NonNull<T>>() {
+                    return Err(EspCoproError::FatPointerTooLarge);
+                }
                 let trans = transfer_value.wrap_transfer_to_lp()?;
-                unsafe {((#a) as *mut *mut u8).write_volatile(trans);}
+                unsafe {((#a) as *mut NonNull<T>).write_volatile(trans);}
             },
-            quote!{unsafe { transfer_value.wrap_transfer_to_main(((#a) as *mut *mut u8).read_volatile())? } })
+            quote!{unsafe { transfer_value.wrap_transfer_to_main(((#a) as *mut NonNull<T>).read_volatile())? } })
         } else { (quote! {}, quote! {})};
     let allocsym = obj_file.symbols().find(|s| s.name().map_or(false, |v| v.starts_with("__COPRO_ALLOCATOR_")));
     let allocfun = if let Some(a) = allocsym {
@@ -417,7 +420,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
             unsafe { core::ptr::copy_nonoverlapping(LP_CODE as *const _ as *const u8, #copy_dest, LP_CODE.len()); }
 
             impl LpCoreCode {
-                pub fn run_light_sleep<T : MovableObject>(
+                pub fn run_light_sleep<T : MovableObject + ?Sized>(
                     &self,
                     lp_core: &mut LpCore,
                     wakeup_source: LpCoreWakeupSource,

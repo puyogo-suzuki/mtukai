@@ -1,4 +1,4 @@
-use core::{alloc::{GlobalAlloc, Layout}, cell::UnsafeCell, mem::MaybeUninit, ptr::null_mut};
+use core::{alloc::{GlobalAlloc, Layout}, cell::UnsafeCell, mem::MaybeUninit, ptr::{null_mut, NonNull}};
 
 /// An LP allocator implementation using a simple linked list of free blocks.
 /// This is used for the LP coprocessor to support dynamic memory allocation.
@@ -120,6 +120,11 @@ pub const fn address_translate_to_lp<T>(addr : * mut T) -> * mut T where T : ?Si
     addr
 }
 
+pub const fn address_translate_to_lp_nonnull<T>(addr : NonNull<T>) -> NonNull<T> where T : ?Sized {
+    let (ptr, md) = addr.to_raw_parts();
+    unsafe { NonNull::from_raw_parts(NonNull::new_unchecked(address_translate_to_lp(ptr.as_ptr())), md) }
+}
+
 #[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]
 #[inline(always)]
 pub fn address_translate_to_main<T>(addr : * mut T) -> * mut T where T : ?Sized {
@@ -136,21 +141,9 @@ pub const fn address_translate_to_main<T>(addr : * mut T) -> * mut T where T : ?
     addr
 }
 
-
-#[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]
-#[inline(always)]
-pub fn address_translate_to_main_const<T>(addr : * const T) -> * const T where T : ?Sized {
-    if in_lp_mem_range_translated(addr) {
-        addr.wrapping_byte_add(LP_ADDRESS_BASE)
-    } else {
-        addr
-    }
-}
-    
-#[cfg(any(not(feature = "esp32s3"), feature = "is-lp-core"))]
-#[inline(always)]
-pub const fn address_translate_to_main_const<T>(addr : * const T) -> * const T where T : ?Sized {
-    addr
+pub const fn address_translate_to_main_nonnull<T>(addr : NonNull<T>) -> NonNull<T> where T : ?Sized {
+    let (ptr, md) = addr.to_raw_parts();
+    unsafe { NonNull::from_raw_parts(NonNull::new_unchecked(address_translate_to_main(ptr.as_ptr())), md) }
 }
 
 /// Check whether the given address is in the LP memory range.
@@ -195,7 +188,10 @@ fn in_lp_mem_range_translated<T>(addr : * const T) -> bool where T : ?Sized {
 }
 
 #[cfg(not(feature = "nottest"))]
-use std::cell::RefCell;
+use std::{
+    cell::RefCell,
+    ptr::NonNull,
+};
 
 #[cfg(not(feature = "nottest"))]
 thread_local! {

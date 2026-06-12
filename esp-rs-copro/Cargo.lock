@@ -589,8 +589,6 @@ dependencies = [
  "esp-lp-hal",
  "esp-println",
  "esp-rs-copro-procmacro",
- "proc-macro2",
- "quote",
  "rand",
 ]
 

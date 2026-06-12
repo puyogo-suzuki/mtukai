@@ -993,7 +993,7 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
         let dst_ptr = crate::lpbox::LPBox::<[T]>::write_to_lp(self.as_slice())?;
         unsafe {
             dest.write_volatile(LPVec {
-                vec_inner : LPVecInner::from_raw_parts(address_translate_to_lp(dst_ptr), self.capacity()),
+                vec_inner : LPVecInner::from_raw_parts(address_translate_to_lp(dst_ptr.as_ptr() as * mut u8), self.capacity()),
                 len : self.len(),
                 _marker : PhantomData
             });

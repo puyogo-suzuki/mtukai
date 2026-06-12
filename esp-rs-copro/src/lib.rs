@@ -139,6 +139,7 @@
 #![feature(trusted_len)]
 #![feature(exact_size_is_empty)]
 #![feature(unsafe_cell_access)]
+#![feature(ptr_metadata)]
 #![cfg_attr(feature = "has-lp-core", feature(cfg_target_has_atomic))]
 #[cfg(feature = "nottest")]
 extern crate alloc;
@@ -170,7 +171,9 @@ pub enum EspCoproError {
     /// Out of memory. This can occur when the LP memory is out of memory.
     OutOfMemory,
     /// The LP coprocessor is in use. Have you started the LP coprocessor on the different thread?
-    InUse
+    InUse,
+    /// The fat pointer is too large to transfer. Please wrap with a struct or use `ThinBox<T>`.
+    FatPointerTooLarge,
 }
 
 /// This is for internal-use.
@@ -206,7 +209,8 @@ impl core::fmt::Display for EspCoproError {
             EspCoproError::NotAllowed => write!(f, "EspCoproError::NotAllowed"),
             EspCoproError::IncorrectlyTransferred => write!(f, "T  EspCoproError::IncorrectlyTransferred"),
             EspCoproError::OutOfMemory => write!(f, "EspCoproError::OutOfMemory"),
-            EspCoproError::InUse => write!(f, "EspCoproError::InUse")
+            EspCoproError::InUse => write!(f, "EspCoproError::InUse"),
+            EspCoproError::FatPointerTooLarge => write!(f, "EspCoproError::FatPointerTooLarge")
         }
     }
 }
@@ -215,15 +219,16 @@ impl core::fmt::Display for EspCoproError {
 pub mod transfer_functions {
     use crate::{lpbox::{LPBox, cleanup, remove_by_main}, movableobject::MovableObject};
     use crate::EspCoproError;
+    use core::{ptr::NonNull, num::NonZero};
     /// This is used in esp-rs-copro-procmacro.
     /// Transfers a value from the main coprocessor to the LP coprocessor.
     /// The value is moved, and the ownership is transferred to the LP coprocessor.
     /// The caller must ensure that the value is not used on the main coprocessor after this function is called.
-    pub fn transfer_to_lp<T : MovableObject>(src : &T) -> Result<*mut u8, EspCoproError> {
-        if core::mem::size_of::<T>() == 0 {
-            Ok(core::ptr::NonNull::<T>::dangling().as_ptr() as * mut u8)
+    pub fn transfer_to_lp<T : MovableObject + ?Sized>(src : &T) -> Result<NonNull<T>, EspCoproError> {
+        if core::mem::size_of_val(src) == 0 {
+            Ok(NonNull::from_ref(src)) // I believe that this is a dangling pointer.
         } else {
-            LPBox::<T>::write_to_lp(src).map(|ptr| crate::lpalloc::address_translate_to_lp(ptr))
+            LPBox::<T>::write_to_lp(src).map(|ptr| ptr.with_addr(unsafe{NonZero::new_unchecked(crate::lpalloc::address_translate_to_lp(ptr.as_ptr()) as *mut () as usize)}))
         }
     }
 
@@ -231,35 +236,22 @@ pub mod transfer_functions {
     /// Transfers a value from the LP coprocessor to the main coprocessor.
     /// The value is moved, and the ownership is transferred to the main coprocessor.
     /// The caller must ensure that the value is not used on the LP coprocessor after this function is called.
-    pub unsafe fn transfer_to_main<T : MovableObject>(src : * const u8, dst : &mut T) -> Result<(), EspCoproError> {
-        if core::mem::size_of::<T>() == 0 {
-            return Ok(());
-        }
-        if let Some(v) = unsafe{(crate::lpalloc::address_translate_to_main_const(src) as * const T).as_ref()} {
-            unsafe{v.move_to_main(dst as * mut T as * mut u8)?;}
-            remove_by_main(dst as * mut T as usize);
-            cleanup();
-            Ok(())
-        } else {
-            Err(EspCoproError::IncorrectlyTransferred)
-        }
+    pub unsafe fn transfer_to_main<T : MovableObject + ?Sized>(src : NonNull<T>, dst : &mut T) -> Result<(), EspCoproError> {
+        let ret = unsafe { transfer_to_main_sub(src, dst) };
+        cleanup();
+        ret
     }
 
-    
     /// This is used in mtukai-projgen-procmacro.
     /// Transfers a value from the LP coprocessor to the main coprocessor.
     /// The value is moved, and the ownership is transferred to the main coprocessor.
     /// The caller must ensure that the value is not used on the LP coprocessor after this function is called.
-    pub unsafe fn transfer_to_main_sub<T : MovableObject>(src : * const u8, dst : &mut T) -> Result<(), EspCoproError> {
-        if core::mem::size_of::<T>() == 0 {
-            return Ok(());
-        }
-        if let Some(v) = unsafe{(crate::lpalloc::address_translate_to_main_const(src) as * const T).as_ref()} {
+    pub unsafe fn transfer_to_main_sub<T : MovableObject + ?Sized>(src : NonNull<T>, dst : &mut T) -> Result<(), EspCoproError> {
+        if core::mem::size_of_val(dst) > 0 {
+            let v = unsafe{src.with_addr(NonZero::new_unchecked(crate::lpalloc::address_translate_to_main(src.as_ptr()) as * mut () as usize)).as_ref()};
             unsafe{v.move_to_main(dst as * mut T as * mut u8)?;}
-            remove_by_main(dst as * mut T as usize);
-            Ok(())
-        } else {
-            Err(EspCoproError::IncorrectlyTransferred)
+            remove_by_main(dst as * mut T as * mut () as usize);
         }
+        Ok(())
     }
 }
