@@ -1094,7 +1094,7 @@ impl<T : Copy, const N: usize> TryFrom<LPVec<LPAdapter<T>>> for [T; N] {
     }
 }
 
-impl<T : MovableObject> const Default for LPVec<T> {
+const impl<T : MovableObject> Default for LPVec<T> {
     fn default() -> LPVec<T> {
         LPVec::new()
     }
