@@ -120,7 +120,7 @@ pub const fn address_translate_to_lp<T>(addr : * mut T) -> * mut T where T : ?Si
     addr
 }
 
-pub const fn address_translate_to_lp_nonnull<T>(addr : NonNull<T>) -> NonNull<T> where T : ?Sized {
+pub fn address_translate_to_lp_nonnull<T>(addr : NonNull<T>) -> NonNull<T> where T : ?Sized {
     let (ptr, md) = addr.to_raw_parts();
     unsafe { NonNull::from_raw_parts(NonNull::new_unchecked(address_translate_to_lp(ptr.as_ptr())), md) }
 }
@@ -141,7 +141,7 @@ pub const fn address_translate_to_main<T>(addr : * mut T) -> * mut T where T : ?
     addr
 }
 
-pub const fn address_translate_to_main_nonnull<T>(addr : NonNull<T>) -> NonNull<T> where T : ?Sized {
+pub fn address_translate_to_main_nonnull<T>(addr : NonNull<T>) -> NonNull<T> where T : ?Sized {
     let (ptr, md) = addr.to_raw_parts();
     unsafe { NonNull::from_raw_parts(NonNull::new_unchecked(address_translate_to_main(ptr.as_ptr())), md) }
 }
