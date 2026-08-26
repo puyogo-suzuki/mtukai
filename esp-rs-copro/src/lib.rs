@@ -126,7 +126,7 @@
 //! We are planning to remove this limitation in the future.
 
 #![cfg_attr(feature="nottest", no_std)]
-#![feature(layout_for_ptr)]
+#![feature(layout_for_ptr)] // layout_for_ptr is necessary for Xtensa toolchain (1.97.0). It is stabilized after 1.99.0.
 #![feature(ptr_internals)]
 #![feature(temporary_niche_types)]
 #![feature(sized_type_properties)]
@@ -174,6 +174,8 @@ pub enum EspCoproError {
     InUse,
     /// The fat pointer is too large to transfer. Please wrap with a struct or use `ThinBox<T>`.
     FatPointerTooLarge,
+    /// Nothing is returned from the LP coprocessor.
+    NoReturn
 }
 
 /// This is for internal-use.
@@ -210,7 +212,8 @@ impl core::fmt::Display for EspCoproError {
             EspCoproError::IncorrectlyTransferred => write!(f, "T  EspCoproError::IncorrectlyTransferred"),
             EspCoproError::OutOfMemory => write!(f, "EspCoproError::OutOfMemory"),
             EspCoproError::InUse => write!(f, "EspCoproError::InUse"),
-            EspCoproError::FatPointerTooLarge => write!(f, "EspCoproError::FatPointerTooLarge")
+            EspCoproError::FatPointerTooLarge => write!(f, "EspCoproError::FatPointerTooLarge"),
+            EspCoproError::NoReturn => write!(f, "EspCoproError::NoReturn"),
         }
     }
 }
