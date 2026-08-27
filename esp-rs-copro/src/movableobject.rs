@@ -97,3 +97,22 @@ impl<T : MovableObject + Copy> MovableObject for MaybeUninit<T> {
         Ok(())
     }
 }
+
+macro_rules! impl_movable_object_for_containers {
+    ($ti:ident, $t:ty, $t2:path) => {
+        impl<$ti: $t2> MovableObject for $t {
+            unsafe fn move_to_main(&self, dest: *mut u8) -> Result<(), EspCoproError> {
+                unsafe { copy_nonoverlapping(self as * const Self, dest as * mut Self, 1); }
+                Ok(())
+            }
+            unsafe fn move_to_lp(&self, dest: *mut u8) -> Result<(), EspCoproError> {
+                unsafe { copy_nonoverlapping(self as * const Self, dest as * mut Self, 1); }
+                Ok(())
+            }
+        }
+    };
+}
+
+impl_movable_object_for_containers!(T, core::cell::Cell<T>, MovableObject);
+impl_movable_object_for_containers!(T, core::cell::RefCell<T>, MovableObject);
+impl_movable_object_for_containers!(T, core::cell::UnsafeCell<T>, MovableObject);
