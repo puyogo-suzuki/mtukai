@@ -116,3 +116,6 @@ macro_rules! impl_movable_object_for_containers {
 impl_movable_object_for_containers!(T, core::cell::Cell<T>, MovableObject);
 impl_movable_object_for_containers!(T, core::cell::RefCell<T>, MovableObject);
 impl_movable_object_for_containers!(T, core::cell::UnsafeCell<T>, MovableObject);
+impl_movable_object_for_containers!(T, core::cell::OnceCell<T>, MovableObject);
+impl_movable_object_for_containers!(T, core::cell::LazyCell<T>, MovableObject);
+impl_movable_object_for_containers!(T, core::mem::ManuallyDrop<T>, MovableObject);
