@@ -8,7 +8,7 @@ license = "Apache-2.0 OR MIT"
 panic = 'abort'
 
 [package.metadata.docs.rs]
-features = ["is-lp-core", "has-lp-core", "esp32c6", "esp32s3"]
+features = ["is-lp-core", "has-lp-core", "esp32c6", "esp32s3", "move_on_need"]
 
 [dependencies]
 esp-println = { version = "0.17.0", features = ["log-04"], optional = true }
@@ -22,9 +22,9 @@ rand = "0.10.0"
 [features]
 default = []
 nottest = []
-unsafe-vtable = []
 is-lp-core = ["dep:esp-lp-hal", "nottest"]
 has-lp-core = ["dep:esp-println", "dep:esp-hal", "nottest"]
 esp32c6 = ["esp-lp-hal?/esp32c6", "esp-hal?/esp32c6", "esp-println?/esp32c6"]
 esp32s3 = ["esp-lp-hal?/esp32s3", "esp-hal?/esp32s3", "esp-println?/esp32s3"]
 custom_range = []
+move_on_need = []

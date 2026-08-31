@@ -27,7 +27,7 @@ impl<T: MovableObject> Debug for LPBox<T> {
 }
 
 /// Get the [`MovableObject`] virtual table of this object.
-#[cfg(feature = "unsafe-vtable")]
+#[cfg(feature = "move_on_need")]
 fn get_vtable(obj: &dyn MovableObject) -> *const u8 {
     let fat_ptr_addr = obj as *const dyn MovableObject as *const [usize; 2];
     unsafe{
@@ -172,7 +172,7 @@ impl<T: MovableObject> LPBox<T> {
         } else {
             let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
             ptr.write(value);
-            #[cfg(all(feature = "unsafe-vtable", feature = "is-lp-core"))]
+            #[cfg(all(feature = "move_on_need", feature = "is-lp-core"))]
             lpalloc::write_vtable(ptr as * mut u8, get_vtable(ptr.as_ref().unwrap()) as * mut u8);
             LPBox(NonNull::new_unchecked(ptr))
         }

@@ -56,7 +56,7 @@ impl BlockHeader {
 }
 
 /// Write virtual table pointer to the block header of the given pointer.
-#[cfg(feature = "unsafe-vtable")]
+#[cfg(feature = "move_on_need")]
 pub unsafe fn write_vtable(ptr: * mut u8, vtable: * mut u8) {
     let header = (ptr as usize - core::mem::size_of::<BlockHeader>()) as * mut BlockHeader;
     unsafe {
@@ -188,10 +188,7 @@ fn in_lp_mem_range_translated<T>(addr : * const T) -> bool where T : ?Sized {
 }
 
 #[cfg(not(feature = "nottest"))]
-use std::{
-    cell::RefCell,
-    ptr::NonNull,
-};
+use std::cell::RefCell;
 
 #[cfg(not(feature = "nottest"))]
 thread_local! {

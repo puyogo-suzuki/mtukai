@@ -103,7 +103,7 @@ lp_box.move_to_lp()?;
   - `esp32c6`: Enable ESP32-C6 specific features
   - `esp32s3`: Enable ESP32-S3 specific features
 - `custom_range`: Use custom memory range configuration
-<!-- - `unsafe-vtable`: Enable unsafe vtable operations -->
+<!-- - `move_on_need`: Enable move on need -->
 
 ## Documentation
 
