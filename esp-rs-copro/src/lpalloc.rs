@@ -229,20 +229,20 @@ unsafe impl<const SIZE : usize> GlobalAlloc for ImplLPAllocator<SIZE> {
                 }
                 // found a block
                 let remaining = (*current).size - total_size;
-                if remaining > core::mem::size_of::<BlockHeader>() + core::mem::size_of::<FreeBlock>() {
+                *current_ptr = if remaining > core::mem::size_of::<BlockHeader>() + core::mem::size_of::<FreeBlock>() {
                     // Split the block
+                    (*current).size = total_size; // The new size.
                     let new_block = (current as usize + total_size) as * mut BlockHeader;
                     BlockHeader::init_header_value(new_block, remaining, 1 as * mut u8, current, (*current).next);
                     if !(*current).next.is_null() {
                         (*address_translate_to_main((*current).next)).prev = address_translate_to_lp(new_block);
                     }
                     (*current).next = address_translate_to_lp(new_block);
-                    (*current).size = total_size;
                     (*(BlockHeader::get_value::<FreeBlock>(new_block))).next = (*fb).next;
-                    *current_ptr = address_translate_to_lp(new_block);
+                    address_translate_to_lp(new_block)
                 } else {
-                    *current_ptr = (*fb).next;
-                }
+                    (*fb).next
+                };
                 return (current as usize + core::mem::size_of::<BlockHeader>()) as * mut u8;
             }
             return null_mut();
