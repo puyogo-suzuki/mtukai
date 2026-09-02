@@ -16,7 +16,7 @@ esp-lp-hal  = { version = "0.3.0", features = [], optional = true}
 esp-hal     = { version = "=1.1.1", features = ["unstable", "log-04"], optional = true }
 
 [dev-dependencies]
-esp-rs-copro-procmacro = { path = "../esp-rs-copro-procmacro", features=["has-lp-core"] }
+esp-rs-copro-procmacro = { path = "../esp-rs-copro-procmacro", features=[] }
 rand = "0.10.0"
 
 [features]
