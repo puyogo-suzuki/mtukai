@@ -144,7 +144,7 @@ impl AddressTranslationTable {
         self.main_to_lp.clear();
     }
 
-    /// Remove the ently by the main address, returning the LP address if it existed.
+    /// Remove the entry by the main address, returning the LP address if it existed.
     /// This must be called by only LPBox.
     pub(crate) fn remove_by_main(&mut self, main: usize) -> Option<usize> {
         self.main_to_lp.remove(&main).and_then(|lp| {

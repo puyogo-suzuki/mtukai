@@ -278,11 +278,18 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     fn write_to_main(value : &T) -> Result<NonNull<T>, EspCoproError> { unsafe {
         let addr =
-            lpbox_static::remove_by_lp(value as * const T as * const () as usize)
-                .map_or_else(|| lpbox_alloc(core::alloc::Layout::for_value(value)) as usize,
-                    |a| a.0);
-        value.move_to_main(addr as * mut u8)?;
-        Ok(NonNull::from_ref(value).with_addr(NonZero::new_unchecked(addr)))
+            if let Some((a, lay)) = lpbox_static::remove_by_lp(value as * const T as * const () as usize) {
+                if lay == core::alloc::Layout::for_value(value) {
+                    a as * mut u8
+                } else {
+                    alloc::dealloc(a as * mut u8, lay);
+                    lpbox_alloc(core::alloc::Layout::for_value(value))
+                }
+            } else {
+                lpbox_alloc(core::alloc::Layout::for_value(value))
+            };
+        value.move_to_main(addr)?;
+        Ok(NonNull::from_ref(value).with_addr(NonZero::new_unchecked(addr as usize)))
     }}
 
     /// This is for internal-use.
