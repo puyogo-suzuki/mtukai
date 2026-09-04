@@ -108,9 +108,9 @@ pub(crate) const fn get_lp_mem_begin_and_len() -> (usize, usize) {
 #[inline(always)]
 pub fn address_translate_to_lp<T>(addr : * mut T) -> * mut T where T : ?Sized {
     if in_lp_mem_range(addr) {
-        addr.wrapping_byte_sub(LP_ADDRESS_BASE)
-    } else {
         addr
+    } else {
+        addr.wrapping_byte_sub(LP_ADDRESS_BASE)
     }
 }
 
