@@ -120,9 +120,31 @@ pub const fn address_translate_to_lp<T>(addr : * mut T) -> * mut T where T : ?Si
     addr
 }
 
+#[cfg(feature = "is-lp-core")]
+#[inline(always)]
+pub fn try_address_translate_for_current_core<T>(addr: *mut T) -> *mut T where T: ?Sized {
+    try_address_translate_on_lp(addr)
+}
+
+#[cfg(not(feature = "is-lp-core"))]
+#[inline(always)]
+pub fn try_address_translate_for_current_core<T>(addr: *mut T) -> *mut T where T: ?Sized {
+    address_translate_to_main(addr)
+}
+
+#[cfg(feature = "is-lp-core")]
+pub fn try_address_translate_on_lp<T>(addr : * mut T) -> * mut T where T : ?Sized {
+    addr
+}
+
 pub fn address_translate_to_lp_nonnull<T>(addr : NonNull<T>) -> NonNull<T> where T : ?Sized {
     let (ptr, md) = addr.to_raw_parts();
     unsafe { NonNull::from_raw_parts(NonNull::new_unchecked(address_translate_to_lp(ptr.as_ptr())), md) }
+}
+
+#[cfg(feature = "is-lp-core")]
+pub fn try_address_translate_on_lp_nonnull<T>(addr : NonNull<T>) -> NonNull<T> where T : ?Sized {
+    addr
 }
 
 #[cfg(all(feature = "esp32s3", feature = "has-lp-core"))]

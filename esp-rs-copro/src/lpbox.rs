@@ -1,7 +1,7 @@
 use core::{fmt::Debug, mem::{self, MaybeUninit, SizedTypeProperties}, ops::{Deref, DerefMut}, ptr::NonNull, borrow::{BorrowMut, Borrow}};
 #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
 use core::num::NonZero;
-use crate::{EspCoproError, lpalloc::{self, address_translate_to_lp, address_translate_to_main}, movableobject::MovableObject};
+use crate::{EspCoproError, lpalloc::{self, address_translate_to_lp}, movableobject::MovableObject};
 #[cfg(feature = "nottest")]
 use alloc::alloc;
 #[cfg(feature = "nottest")]
@@ -19,6 +19,18 @@ use std::{alloc, boxed::Box, cmp::Ordering};
 /// **caution**: `drop`ing [`Box<T>`] allocated by [`LPBox<T>`] is undefined behavior.
 /// Always convert it back to [`LPBox<T>`] before dropping, or use `into_raw` and `from_raw` to manage the memory manually.
 pub struct LPBox<T: ?Sized + MovableObject>(pub(crate) NonNull<T>);
+
+#[cfg(not(feature = "is-lp-core"))]
+#[inline(always)]
+fn address_translate_to_lp_for_current_core<T>(addr: NonNull<T>) -> NonNull<T> where T: ?Sized {
+    lpalloc::address_translate_to_lp_nonnull(addr)
+}
+
+#[cfg(feature = "is-lp-core")]
+#[inline(always)]
+fn address_translate_to_lp_for_current_core<T>(addr: NonNull<T>) -> NonNull<T> where T: ?Sized {
+    lpalloc::try_address_translate_on_lp_nonnull(addr)
+}
 
 impl<T: MovableObject> Debug for LPBox<T> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -70,7 +82,7 @@ pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
 #[cfg(feature = "has-lp-core")]
 pub(crate) mod lpbox_static {
     // WE ASUME THAT lpbox_static IS ONLY USED ON SINGLE THREADED PROGRAMS.
-    use crate::addresstranslation::AddressTranslationTable;
+    use crate::addresstranslation::{AddressTranslationEntry, AddressTranslationTable};
     use core::{alloc::Layout, cell::UnsafeCell};
 
     static ADDRESS_TRANSLATION_TABLE : SyncUnsafeCell<AddressTranslationTable> =
@@ -97,7 +109,7 @@ pub(crate) mod lpbox_static {
     pub fn remove_by_main(main: usize) -> Option<usize> {
         ADDRESS_TRANSLATION_TABLE.get().remove_by_main(main)
     }
-    pub fn remove_by_lp(lp: usize) -> Option<(usize, Layout)> {
+    pub fn remove_by_lp(lp: usize) -> Option<AddressTranslationEntry> {
         ADDRESS_TRANSLATION_TABLE.get().remove_by_lp(lp)
     }
     pub(crate) fn get_by_main(main: usize) -> Option<usize> {
@@ -110,7 +122,7 @@ pub(crate) mod lpbox_static {
 
 #[cfg(not(feature = "nottest"))]
 pub(crate) mod lpbox_static {
-    use crate::addresstranslation::AddressTranslationTable;
+    use crate::addresstranslation::{AddressTranslationEntry, AddressTranslationTable};
     use core::cell::{RefCell, Cell};
     use std::alloc::Layout;
 
@@ -131,7 +143,7 @@ pub(crate) mod lpbox_static {
     pub fn remove_by_main(main: usize) -> Option<usize> {
         ADDRESS_TRANSLATION_TABLE.with_borrow_mut(|tbl| tbl.remove_by_main(main))
     }
-    pub fn remove_by_lp(lp: usize) -> Option<(usize, Layout)> {
+    pub fn remove_by_lp(lp: usize) -> Option<AddressTranslationEntry> {
         ADDRESS_TRANSLATION_TABLE.with_borrow_mut(|tbl| tbl.remove_by_lp(lp))
     }
     pub fn get_by_main(main: usize) -> Option<usize> {
@@ -217,14 +229,14 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     /// Convert an [`LPBox`] into a raw pointer. The value is not moved, and the caller takes ownership of the memory.
     #[must_use = "losing the pointer will leak memory"]
     pub fn into_raw(self) -> * mut T {
-        address_translate_to_main(self.into_raw_without_translation())
+        lpalloc::try_address_translate_for_current_core(self.into_raw_without_translation())
     }
 
     /// Get a raw pointer to the value.
     /// The value is not moved.
     /// The ownership is not transferred, and the caller must ensure that the value is not dropped while using the pointer.
     pub fn as_ptr(&self) -> * const T {
-        address_translate_to_main(self.0.as_ptr()) as * const T
+        lpalloc::try_address_translate_for_current_core(self.0.as_ptr()) as * const T
     }
 
     /// Convert an [`LPBox`] into a raw pointer. The value is not moved, and the caller takes ownership of the memory.
@@ -247,7 +259,7 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     /// The value is not moved.
     /// The ownership is not transferred, and the caller must ensure that the value is not dropped while using the pointer.
     pub fn as_mut_ptr(&mut self) -> * mut T {
-        address_translate_to_main(self.0.as_ptr())
+        lpalloc::try_address_translate_for_current_core(self.0.as_ptr())
     }
 
     /// This is for internal-use.
@@ -277,16 +289,18 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     /// If the value is already in the main memory, the value on the main memory is overwritten.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     fn write_to_main(value : &T) -> Result<NonNull<T>, EspCoproError> { unsafe {
+        let my_layout = core::alloc::Layout::for_value(value);
         let addr =
-            if let Some((a, lay)) = lpbox_static::remove_by_lp(value as * const T as * const () as usize) {
+            if let Some(entry) = lpbox_static::remove_by_lp(value as * const T as * const () as usize) {
+                let lay = entry.address.get_layout();
                 if lay == core::alloc::Layout::for_value(value) {
-                    a as * mut u8
+                    entry.address.get_addr() as * mut u8
                 } else {
-                    alloc::dealloc(a as * mut u8, lay);
-                    lpbox_alloc(core::alloc::Layout::for_value(value))
+                    alloc::dealloc(entry.address.get_addr() as * mut u8, lay);
+                    lpbox_alloc(my_layout)
                 }
             } else {
-                lpbox_alloc(core::alloc::Layout::for_value(value))
+                lpbox_alloc(my_layout)
             };
         value.move_to_main(addr)?;
         Ok(NonNull::from_ref(value).with_addr(NonZero::new_unchecked(addr as usize)))
@@ -297,15 +311,16 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     /// If the value is already in the LP memory, it is not moved again.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub unsafe fn get_moved_to_lp(&self) -> Result<LPBox<T>, EspCoproError> {
-        use crate::lpalloc::address_translate_to_lp_nonnull;
-        unsafe{ Ok(LPBox(address_translate_to_lp_nonnull(Self::write_to_lp(self.0.as_ref())?))) }
+        unsafe{
+            Ok(LPBox(lpalloc::address_translate_to_lp_nonnull(Self::write_to_lp(self.0.as_ref())?)))
+        }
     }
     /// This is for internal-use.
     /// Returns a reference to the moved value. The value is moved to the main memory.
     /// If the value is already in the main memory, the value on the main memory is overwritten.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub unsafe fn get_moved_to_main(&self) -> Result<LPBox<T>, EspCoproError> {
-        unsafe { Ok(LPBox(self.0.with_addr(NonZero::new_unchecked((Self::write_to_main(address_translate_to_main(self.0.as_ptr()).as_ref_unchecked())?).as_ptr() as * mut () as usize))) )}
+        unsafe { Ok(LPBox(self.0.with_addr(NonZero::new_unchecked((Self::write_to_main(lpalloc::address_translate_to_main(self.0.as_ptr()).as_ref_unchecked())?).as_ptr() as * mut () as usize))) )}
     }
     // call the main processor's function.
     // #[cfg(feature = "is-lp-core")]
@@ -346,12 +361,12 @@ impl<T: ?Sized + MovableObject> MovableObject for LPBox<T> {
 impl<T : ?Sized + MovableObject> Deref for LPBox<T> {
     type Target = T;
     fn deref(&self) -> &Self::Target {
-        unsafe { address_translate_to_main(self.0.as_ptr()).as_ref_unchecked() }
+        unsafe { lpalloc::try_address_translate_for_current_core(self.0.as_ptr()).as_ref_unchecked() }
     }
 }
 impl<T : ?Sized + MovableObject> DerefMut for LPBox<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { address_translate_to_main(self.0.as_ptr()).as_mut_unchecked() }
+        unsafe { lpalloc::try_address_translate_for_current_core(self.0.as_ptr()).as_mut_unchecked() }
     }
 }
 
