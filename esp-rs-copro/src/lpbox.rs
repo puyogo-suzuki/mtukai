@@ -302,6 +302,7 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
             } else {
                 lpbox_alloc(my_layout)
             };
+        if addr.is_null() { return Err(EspCoproError::OutOfMemory); }
         value.move_to_main(addr)?;
         Ok(NonNull::from_ref(value).with_addr(NonZero::new_unchecked(addr as usize)))
     }}
