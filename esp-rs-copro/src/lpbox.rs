@@ -288,7 +288,7 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     /// Returns a reference to the value. The value is moved to the main memory.
     /// If the value is already in the main memory, the value on the main memory is overwritten.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
-    fn write_to_main(value : &T) -> Result<NonNull<T>, EspCoproError> { unsafe {
+    pub(crate) fn write_to_main(value : &T) -> Result<NonNull<T>, EspCoproError> { unsafe {
         let my_layout = core::alloc::Layout::for_value(value);
         let addr =
             if let Some(entry) = lpbox_static::remove_by_lp(value as * const T as * const () as usize) {
@@ -296,7 +296,7 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
                 if lay == core::alloc::Layout::for_value(value) {
                     entry.address.get_addr() as * mut u8
                 } else {
-                    alloc::dealloc(entry.address.get_addr() as * mut u8, lay);
+                    alloc::dealloc(entry.address.get_addr() as * mut u8, entry.address.get_layout());
                     lpbox_alloc(my_layout)
                 }
             } else {
