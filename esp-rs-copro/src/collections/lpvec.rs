@@ -1013,12 +1013,14 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
                     crate::lpbox::lpbox_alloc(lay) as usize
                 },
                 |a| {
+                    let addr = a.address.get_addr();
+                    let lay = a.address.get_layout();
                     // Check the layout is unmodified.
-                    if a.1 != core::alloc::Layout::for_value(src) {
+                    if lay != core::alloc::Layout::for_value(src) {
                         // extend the main's.
-                        crate::lpbox::lpbox_realloc(a.0 as * mut u8, a.1, core::alloc::Layout::for_value(src).size()) as usize
+                        crate::lpbox::lpbox_realloc(addr as * mut u8, lay, core::alloc::Layout::for_value(src).size()) as usize
                     } else {
-                        a.0
+                        addr
                     }
                 });
             src.move_to_main(addr as * mut u8)?;
