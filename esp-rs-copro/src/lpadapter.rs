@@ -1,4 +1,4 @@
-use core::{ops::{Deref, DerefMut}, ptr, slice};
+use core::{ops::{AddAssign, BitAndAssign, BitOrAssign, BitXorAssign, Deref, DerefMut, DivAssign, MulAssign, RemAssign, ShlAssign, ShrAssign, SubAssign}, ptr, slice};
 use crate::movableobject::MovableObject;
 
 /// This struct is a wrapper around a type `T` that allows it to be transferred between the main and the LP processors without requiring any special handling.
@@ -117,3 +117,30 @@ impl<T: Copy> From<T> for LPAdapter<T> {
         Self { inner: value }
     }
 }
+
+macro_rules! impl_assign {
+    ($trait:ident, $method:ident, $op:tt) => {
+        impl<T: $trait<T> + Copy> $trait<T> for LPAdapter<T> {
+            fn $method(&mut self, rhs: T) {
+                self.inner $op rhs;
+            }
+        }
+
+        impl<T: $trait<T> + Copy> $trait<LPAdapter<T>> for LPAdapter<T> {
+            fn $method(&mut self, rhs: LPAdapter<T>) {
+                self.inner $op rhs.inner;
+            }
+        }
+    };
+}
+
+impl_assign!(AddAssign, add_assign, +=);
+impl_assign!(SubAssign, sub_assign, -=);
+impl_assign!(MulAssign, mul_assign, *=);
+impl_assign!(DivAssign, div_assign, /=);
+impl_assign!(RemAssign, rem_assign, %=);
+impl_assign!(ShlAssign, shl_assign, <<=);
+impl_assign!(ShrAssign, shr_assign, >>=);
+impl_assign!(BitOrAssign, bitor_assign, |=);
+impl_assign!(BitAndAssign, bitand_assign, &=);
+impl_assign!(BitXorAssign, bitxor_assign, ^=);
