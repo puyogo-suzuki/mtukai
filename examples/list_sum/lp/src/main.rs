@@ -18,6 +18,7 @@ fn main() -> ! {
     let v: &mut MainLPParcel = get_transfer::<MainLPParcel>().unwrap();
     v.result = v.data.sum();
     v.data.push(10000);
+    v.do_rc_test();
     Delay.delay_millis(1000);
     wake_hp_core();
     lp_core_halt()

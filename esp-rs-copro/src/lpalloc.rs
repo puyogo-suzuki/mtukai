@@ -133,6 +133,33 @@ pub fn try_address_translate_for_current_core<T>(addr: *mut T) -> *mut T where T
 }
 
 #[cfg(feature = "is-lp-core")]
+#[inline(always)]
+pub fn try_address_translate_for_current_core_const<T>(addr: *const T) -> *const T where T: ?Sized {
+    // Address translation does not modify the data. It is safe.
+    try_address_translate_on_lp(addr as * mut T) as * const T
+}
+
+#[cfg(not(feature = "is-lp-core"))]
+#[inline(always)]
+pub fn try_address_translate_for_current_core_const<T>(addr: *const T) -> *const T where T: ?Sized {
+    // Address translation does not modify the data. It is safe.
+    address_translate_to_main(addr as * mut T) as * const T
+}
+
+#[cfg(feature = "is-lp-core")]
+#[inline(always)]
+pub fn try_address_translate_for_current_core_nonnull<T>(addr: NonNull<T>) -> NonNull<T> where T: ?Sized {
+    try_address_translate_on_lp_nonnull(addr)
+}
+
+#[cfg(not(feature = "is-lp-core"))]
+#[inline(always)]
+pub fn try_address_translate_for_current_core_nonnull<T>(addr: NonNull<T>) -> NonNull<T> where T: ?Sized {
+    address_translate_to_main_nonnull(addr)
+}
+
+
+#[cfg(feature = "is-lp-core")]
 pub fn try_address_translate_on_lp<T>(addr : * mut T) -> * mut T where T : ?Sized {
     addr
 }

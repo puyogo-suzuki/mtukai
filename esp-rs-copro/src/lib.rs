@@ -139,6 +139,7 @@
 #![feature(trusted_len)]
 #![feature(exact_size_is_empty)]
 #![feature(unsafe_cell_access)]
+#![feature(ptr_alignment_type)]
 #![feature(ptr_metadata)]
 #[cfg(feature = "nottest")]
 extern crate alloc;
@@ -146,6 +147,8 @@ extern crate alloc;
 pub mod lpalloc;
 /// This module provides a smart pointer type, [`LPBox<T>`][crate::lpbox::LPBox], which is similar to [`Box<T>`] but supports allocations on the LP memory and can be transferred between the main and the LP coprocessors.
 pub mod lpbox;
+/// This module provides a prototype shared-owner pointer, [`LPRc<T>`][crate::lprc::LPRc], similar to [`Rc<T>`] for LP memory.
+pub mod lprc;
 /// This module provides an adapter, which automatically implements [`MovableObject`][crate::movableobject::MovableObject] for types that implement [`Copy`].
 pub mod lpadapter;
 /// This module provides a trait, [`MovableObject`][crate::movableobject::MovableObject], for types that can be moved between the main and the LP coprocessors.

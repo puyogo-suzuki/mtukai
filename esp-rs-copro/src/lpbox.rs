@@ -82,7 +82,7 @@ pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
 #[cfg(feature = "has-lp-core")]
 pub(crate) mod lpbox_static {
     // WE ASUME THAT lpbox_static IS ONLY USED ON SINGLE THREADED PROGRAMS.
-    use crate::addresstranslation::{AddressTranslationEntry, AddressTranslationTable};
+    use crate::addresstranslation::{AddressTranslationEntry, AddressTranslationTable, AddressTranslationAddressValue};
     use core::{alloc::Layout, cell::UnsafeCell};
 
     static ADDRESS_TRANSLATION_TABLE : SyncUnsafeCell<AddressTranslationTable> =
@@ -115,14 +115,27 @@ pub(crate) mod lpbox_static {
     pub(crate) fn get_by_main(main: usize) -> Option<usize> {
         ADDRESS_TRANSLATION_TABLE.get().get_by_main(main)
     }
+    pub fn get_by_lp(lp: usize, set_copied : bool) -> Option<(AddressTranslationAddressValue, bool)> {
+        let ate = ADDRESS_TRANSLATION_TABLE.get().get_by_lp(lp);
+        if let Some(ate) = ate {
+            let already_copied = ate.copied.get();
+            ate.copied.set(already_copied | set_copied);
+            Some((ate.address.clone(), already_copied))
+        } else {
+            None
+        }
+    }
     pub(crate) fn insert_no_drop<T : ?Sized>(main: *mut T, lp: usize) {
-        ADDRESS_TRANSLATION_TABLE.get().insert_no_drop(main, lp);
+        ADDRESS_TRANSLATION_TABLE.get().insert_no_drop(main, lp, false);
+    }
+    pub(crate) fn insert_no_drop_copied<T : ?Sized>(main: *mut T, lp: usize) {
+        ADDRESS_TRANSLATION_TABLE.get().insert_no_drop(main, lp, true);
     }
 }
 
 #[cfg(not(feature = "nottest"))]
 pub(crate) mod lpbox_static {
-    use crate::addresstranslation::{AddressTranslationEntry, AddressTranslationTable};
+    use crate::addresstranslation::{AddressTranslationAddressValue, AddressTranslationEntry, AddressTranslationTable};
     use core::cell::{RefCell, Cell};
     use std::alloc::Layout;
 
@@ -149,8 +162,23 @@ pub(crate) mod lpbox_static {
     pub fn get_by_main(main: usize) -> Option<usize> {
         ADDRESS_TRANSLATION_TABLE.with_borrow(|tbl| tbl.get_by_main(main))
     }
+    pub fn get_by_lp(lp: usize, set_copied : bool) -> Option<(AddressTranslationAddressValue, bool)> {
+        ADDRESS_TRANSLATION_TABLE.with_borrow(|tbl| {
+            let ate = tbl.get_by_lp(lp);
+            if let Some(ate) = ate {
+                let already_copied = ate.copied.get();
+                ate.copied.set(already_copied | set_copied);
+                Some((ate.address.clone(), already_copied))
+            } else {
+                None
+            }
+        })
+    }
     pub(crate) fn insert_no_drop<T : ?Sized>(main: *mut T, lp: usize) {
-        ADDRESS_TRANSLATION_TABLE.with_borrow_mut(|tbl| tbl.insert_no_drop(main, lp));
+        ADDRESS_TRANSLATION_TABLE.with_borrow_mut(|tbl| tbl.insert_no_drop(main, lp, false));
+    }
+    pub(crate) fn insert_no_drop_copied<T : ?Sized>(main: *mut T, lp: usize) {
+        ADDRESS_TRANSLATION_TABLE.with_borrow_mut(|tbl| tbl.insert_no_drop(main, lp, true));
     }
 }
 

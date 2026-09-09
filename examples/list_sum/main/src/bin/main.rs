@@ -82,10 +82,7 @@ fn main() -> ! {
     {
         let (list, expected_sum) = gen_list();
         print_list(&list);
-        let mut parcel = MainLPParcel {
-            data : LPBox::new(list),
-            result : 0
-        };
+        let mut parcel = MainLPParcel::new(LPBox::new(list), 0);
         println!("lpcore run");
         #[cfg(feature = "esp32c6")]
         let wakeupsource = LpCoreWakeupSource::HpCpu;
@@ -97,7 +94,8 @@ fn main() -> ! {
         }
         println!("result: {} (expected: {})", parcel.result, expected_sum);
         print_list(&parcel.data);
-        println!("result: {} (expected: {})", parcel.data.sum(), expected_sum + 10000)
+        println!("result: {} (expected: {})", parcel.data.sum(), expected_sum + 10000);
+        println!("rc_test: {}", parcel.test_after_lp());
     }
     loop {}
 }
