@@ -23,6 +23,7 @@ pub struct LPRc<T: ?Sized + MovableObject> {
     _marker: PhantomData<T>,
 }
 
+#[cfg(not(feature="esp32s3"))]
 pub struct LPArc<T: ?Sized + MovableObject> {
     ptr: NonNull<AInner<T>>,
     _marker: PhantomData<T>,
@@ -35,6 +36,7 @@ struct Inner<T: ?Sized + MovableObject> {
     value: T,
 }
 
+#[cfg(not(feature="esp32s3"))]
 #[repr(C, align(2))]
 struct AInner<T: ?Sized + MovableObject> {
     strong: AtomicUsize,
@@ -59,6 +61,7 @@ impl<T: ?Sized + MovableObject> Inner<T> {
     }
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> AInner<T> {
     fn get_strong(&self) -> usize {
         self.strong.load(Ordering::Acquire)
@@ -98,6 +101,7 @@ pub struct LPWeak<T: ?Sized + MovableObject> {
 ///
 /// A weak reference does not keep the data alive. Once the last strong reference is dropped,
 /// the weak reference will return `None` from `upgrade()`.
+#[cfg(not(feature="esp32s3"))]
 pub struct LPAWeak<T: ?Sized + MovableObject> {
     ptr: NonNull<AInner<T>>,
     _marker: PhantomData<T>,
@@ -142,6 +146,7 @@ impl<T: ?Sized + MovableObject> LPWeak<T> {
 }
 
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> LPAWeak<T> {
     /// Returns a reference to the inner `Inner` struct.
     fn get_inner(&self) -> &AInner<T> {
@@ -191,6 +196,7 @@ impl<T: ?Sized + MovableObject> Clone for LPWeak<T> {
     }
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> Clone for LPAWeak<T> {
     fn clone(&self) -> Self {
         self.get_inner().weak.fetch_add(1, Ordering::Relaxed);
@@ -216,6 +222,7 @@ impl<T: ?Sized + MovableObject> Drop for LPWeak<T> {
     }
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> Drop for LPAWeak<T> {
     fn drop(&mut self) {
         unsafe {
@@ -242,6 +249,7 @@ where
     }
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> core::fmt::Debug for LPAWeak<T>
 where
     T: core::fmt::Debug,
@@ -320,6 +328,7 @@ impl<T: ?Sized + MovableObject> LPRc<T> {
 
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> LPArc<T> {
     fn get_inner(&self) -> &AInner<T> {
         unsafe { lpalloc::try_address_translate_for_current_core_nonnull(self.ptr).as_ref() }
@@ -437,6 +446,7 @@ impl<T: MovableObject> LPRc<T> {
     }
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: MovableObject> LPArc<T> {
     /// Create a new [`LPRc`] containing the given value.
     /// The value is allocated on the main memory on the main processor, and is allocated on the LP memory on the LP coprocessor.
@@ -500,6 +510,7 @@ impl<T: ?Sized + MovableObject> Clone for LPRc<T> {
     }
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> Clone for LPArc<T> {
     fn clone(&self) -> Self {
         self.get_inner().strong.fetch_add(1, Ordering::Relaxed);
@@ -519,6 +530,7 @@ impl<T: ?Sized + MovableObject> Deref for LPRc<T> {
     }
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> Deref for LPArc<T> {
     type Target = T;
 
@@ -550,6 +562,7 @@ impl<T: ?Sized + MovableObject> Drop for LPRc<T> {
     }
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> Drop for LPArc<T> {
     fn drop(&mut self) {
         unsafe {
@@ -578,6 +591,7 @@ impl<T: MovableObject> AsRef<T> for LPRc<T> {
     }
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: MovableObject> AsRef<T> for LPArc<T> {
     fn as_ref(&self) -> &T {
         &**self
@@ -590,6 +604,7 @@ impl<T: ?Sized + MovableObject> PartialEq for LPRc<T> {
     }
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> PartialEq for LPArc<T> {
     fn eq(&self, other: &Self) -> bool {
         LPArc::ptr_eq(self, other)
@@ -597,6 +612,7 @@ impl<T: ?Sized + MovableObject> PartialEq for LPArc<T> {
 }
 
 impl<T: ?Sized + MovableObject> Eq for LPRc<T> {}
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> Eq for LPArc<T> {}
 
 impl<T: ?Sized + MovableObject + core::fmt::Debug> core::fmt::Debug for LPRc<T>
@@ -609,6 +625,7 @@ impl<T: ?Sized + MovableObject + core::fmt::Debug> core::fmt::Debug for LPRc<T>
     }
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject + core::fmt::Debug> core::fmt::Debug for LPArc<T>
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -647,6 +664,7 @@ impl<T: ?Sized + MovableObject> MovableObject for Inner<T> {
     }
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> MovableObject for AInner<T> {
     #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
@@ -795,6 +813,7 @@ impl<T: ?Sized + MovableObject> MovableObject for LPWeak<T> {
     }
 }
 
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> MovableObject for LPAWeak<T> {
     #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
@@ -847,7 +866,7 @@ impl<T: ?Sized + MovableObject> MovableObject for LPRc<T> {
     }
 }
 
-
+#[cfg(not(feature="esp32s3"))]
 impl<T: ?Sized + MovableObject> MovableObject for LPArc<T> {
     #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
