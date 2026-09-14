@@ -29,6 +29,11 @@ pub struct LPArc<T: ?Sized + MovableObject> {
     _marker: PhantomData<T>,
 }
 
+#[cfg(not(feature="esp32s3"))]
+unsafe impl<T: ?Sized + Sync + Send + MovableObject> Send for LPArc<T> {}
+#[cfg(not(feature="esp32s3"))]
+unsafe impl<T: ?Sized + Sync + Send + MovableObject> Sync for LPArc<T> {}
+
 #[repr(C, align(2))]
 struct Inner<T: ?Sized + MovableObject> {
     strong: Cell<usize>,
@@ -43,6 +48,11 @@ struct AInner<T: ?Sized + MovableObject> {
     weak: AtomicUsize,
     value: T,
 }
+
+#[cfg(not(feature="esp32s3"))]
+unsafe impl<T: ?Sized + Sync + Send + MovableObject> Send for AInner<T> {}
+#[cfg(not(feature="esp32s3"))]
+unsafe impl<T: ?Sized + Sync + Send + MovableObject> Sync for AInner<T> {}
 
 impl<T: ?Sized + MovableObject> Inner<T> {
     fn get_strong(&self) -> usize {
