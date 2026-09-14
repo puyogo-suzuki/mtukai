@@ -137,6 +137,7 @@ impl<T: ?Sized + MovableObject> LPWeak<T> {
         self.get_inner().get_weak().saturating_sub(1)
     }
 
+    #[cfg(not(feature = "is-lp-core"))]
     fn from_inner(ptr: NonNull<Inner<T>>) -> Self {
         LPWeak {
             ptr,
@@ -177,6 +178,7 @@ impl<T: ?Sized + MovableObject> LPAWeak<T> {
         self.get_inner().get_weak().saturating_sub(1)
     }
 
+    #[cfg(not(feature = "is-lp-core"))]
     fn from_inner(ptr: NonNull<AInner<T>>) -> Self {
         LPAWeak {
             ptr,

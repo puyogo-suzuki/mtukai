@@ -1,7 +1,7 @@
 #[cfg(all(feature = "has-lp-core", feature="esp32c6"))]
-use esp_hal::{gpio::{lp_io::{LowPowerInput, LowPowerOutput, LowPowerOutputOpenDrain}, InputPin, OutputPin, RtcPin}};
+use esp_hal::{gpio::{lp_io::{LowPowerInput, LowPowerOutput, LowPowerOutputOpenDrain, LowPowerPin}, InputPin, OutputPin}};
 #[cfg(all(feature = "has-lp-core", feature="esp32s3"))]
-use esp_hal::{gpio::{rtc_io::{LowPowerInput, LowPowerOutput, LowPowerOutputOpenDrain}, InputPin, OutputPin, RtcPin}};
+use esp_hal::{gpio::{rtc_io::{LowPowerInput, LowPowerOutput, LowPowerOutputOpenDrain, LowPowerPin}, InputPin, OutputPin}};
 
 #[cfg(feature = "is-lp-core")]
 use esp_lp_hal::gpio::{Input, Output};
@@ -24,7 +24,7 @@ pub struct LPInput<'d, const PIN: u8> {
 #[cfg(feature = "has-lp-core")]
 impl<'d, const PIN: u8> LPInput<'d, PIN> {
     /// Create a new low-power input pin.
-    pub fn new<P>(pin: P) -> Self where P: InputPin + RtcPin + 'd {
+    pub fn new<P>(pin: P) -> Self where P: InputPin + LowPowerPin<PIN> + 'd {
         Self { inner: LowPowerInput::new(pin) }
     }
 
@@ -73,7 +73,7 @@ pub struct LPOutput<'d, const PIN: u8> {
 #[cfg(feature = "has-lp-core")]
 impl<'d, const PIN: u8> LPOutput<'d, PIN> {
     /// Create a new low-power output pin.
-    pub fn new<P>(pin: P) -> Self where P: OutputPin + RtcPin + 'd {
+    pub fn new<P>(pin: P) -> Self where P: OutputPin + LowPowerPin<PIN> + 'd {
         Self { inner: LowPowerOutput::new(pin) }
     }
 }
@@ -116,7 +116,7 @@ pub struct LPOutputOpenDrain<'d, const PIN: u8> {
 #[cfg(feature = "has-lp-core")]
 impl<'d, const PIN: u8> LPOutputOpenDrain<'d, PIN> {
     /// Create a new low-power output pin.
-    pub fn new<P>(pin: P) -> Self where P: InputPin + OutputPin + RtcPin + 'd {
+    pub fn new<P>(pin: P) -> Self where P: InputPin + OutputPin + LowPowerPin<PIN> + 'd {
         Self { inner: LowPowerOutputOpenDrain::new(pin) }
     }
 
@@ -131,8 +131,7 @@ impl<'d, const PIN: u8> LPOutputOpenDrain<'d, PIN> {
     }
 }
 
-// ESP-HAL 1.0.0 does not provide open-drain output pin.
-// stay tuned...
+// The current esp-lp-hal does not provide open-drain output pin.
 
 #[cfg(feature = "has-lp-core")]
 impl<'d, const PIN: u8> MovableObject for LPOutputOpenDrain<'d, PIN> {

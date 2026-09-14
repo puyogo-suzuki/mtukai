@@ -22,8 +22,8 @@ impl TempAndHumid {
 }
 
 #[derive(esp_rs_copro_procmacro::MovableObject)]
-pub struct MainLPParcel{
-    pub i2c : LPI2C,
+pub struct MainLPParcel<'a>{
+    pub i2c : LPI2C<'a>,
     pub measurement_count : usize,
     pub result : LPVec<Option<TempAndHumid>>
 }

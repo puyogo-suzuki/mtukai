@@ -337,24 +337,24 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         .filter(|v: &proc_macro2::TokenStream| !v.is_empty())
         .collect();
 
+    let imports = quote! {
+        use #hal_crate::rtc_cntl::sleep::{LowPower, RtcSleepConfig};
+        use #hal_crate::gpio::*;
+    };
     #[cfg(feature = "esp32c6")]
     let imports = quote! {
+        #imports
         use #hal_crate::lp_core::LpCore;
         use #hal_crate::lp_core::LpCoreWakeupSource;
-        use #hal_crate::gpio::lp_io::LowPowerOutput;
-        use #hal_crate::gpio::*;
         use #hal_crate::uart::lp_uart::LpUart;
         use #hal_crate::i2c::lp_i2c::LpI2c;
-        use #hal_crate::rtc_cntl::Rtc;
-        use #hal_crate::rtc_cntl::sleep::WakeFromLpCoreWakeupSource;
         #copro_crate_use;
     };
     #[cfg(feature = "esp32s3")]
     let imports = quote! {
+        #imports
         use #hal_crate::ulp_core::UlpCore as LpCore;
         use #hal_crate::ulp_core::UlpCoreWakeupSource as LpCoreWakeupSource;
-        use #hal_crate::rtc_cntl::sleep::UlpWakeupSource as WakeFromLpCoreWakeupSource;
-        use #hal_crate::gpio::*;
         #copro_crate_use;
     };
 
@@ -435,10 +435,10 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         }
     }
     
-    let sleeplight = if cfg!(feature = "esp32c6") {
-        quote! { rtc.sleep_light(&[&WakeFromLpCoreWakeupSource::new()]) }
+    let enable_wakeup = if cfg!(feature = "esp32c6") {
+        quote! { lp_core.enable_wakeup(); }
     } else {
-        quote! { rtc.sleep_light(&[&UlpWakeupSource::new()]) }
+        quote! { lp_core.enable_wakeup(WakeupConfig::default()); }
     };
 
     quote! {
@@ -455,14 +455,15 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                     &self,
                     lp_core: &mut LpCore,
                     wakeup_source: LpCoreWakeupSource,
-                    rtc : &mut Rtc,
+                    lpwr : &mut LowPower<'_>,
                     transfer_value : &mut T,
                     #(_: #run_light_sleep_args),*
                 ) -> Result<(), EspCoproError> {
                     try_copro_lock()?;
                     #alloccall
+                    #enable_wakeup
                     lp_core.run(wakeup_source);
-                    #sleeplight;
+                    lpwr.sleep_light(RtcSleepConfig::default());
                     #transfer_back;
                     copro_unlock();
                     Ok(())

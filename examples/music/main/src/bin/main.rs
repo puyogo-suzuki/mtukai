@@ -8,7 +8,7 @@
 
 use esp_alloc as _;
 use esp_hal::{
-    rtc_cntl::Rtc,
+    rtc_cntl::sleep::LowPower,
     lp_core::{LpCore, LpCoreWakeupSource},
 };
 use esp_println::println;
@@ -55,7 +55,7 @@ fn main() -> ! {
             outpin: LPOutput::<1>::new(peripherals.GPIO1)
         };
 
-        if let Err(e) = lp_core_code.run_light_sleep(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut Rtc::new(peripherals.LPWR), &mut parcel) {
+        if let Err(e) = lp_core_code.run_light_sleep(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut LowPower::new(peripherals.LPWR), &mut parcel) {
             println!("Error running LP core!: {}", e);
         }
     }

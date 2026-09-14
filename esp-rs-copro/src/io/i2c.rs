@@ -3,13 +3,15 @@ use crate::{movableobject::MovableObject, EspCoproError};
 /// A wrapper for low-power I2C peripheral that can be used in the LP core.
 /// This struct is a movable object and can be transferred between the main core and the LP core.
 /// It provides basic I2C operations such as read, write, and write_read.
-pub struct LPI2C {
+pub struct LPI2C<'a> {
     #[cfg(feature = "has-lp-core")]
     #[allow(unused)]
-    i2c : esp_hal::i2c::lp_i2c::LpI2c,
+    i2c : esp_hal::i2c::lp_i2c::LpI2c<'a>,
     #[cfg(feature = "is-lp-core")]
     #[allow(unused)]
     i2c : esp_lp_hal::i2c::LpI2c,
+    #[cfg(feature = "is-lp-core")]
+    phantom: core::marker::PhantomData<&'a ()>
 }
 
 /// Possible errors that can occur during I2C operations.
@@ -67,11 +69,11 @@ impl LPI2CError {
     // }
 }
 
-impl LPI2C {
+impl LPI2C<'_> {
     #[cfg(feature = "has-lp-core")]
-    pub fn new(i2c : esp_hal::i2c::lp_i2c::LpI2c) -> Self { LPI2C { i2c } }
+    pub fn new(i2c : esp_hal::i2c::lp_i2c::LpI2c<'_>) -> LPI2C<'_> { LPI2C { i2c } }
     #[cfg(feature = "is-lp-core")]
-    pub fn new(i2c : esp_lp_hal::i2c::LpI2c) -> Self { LPI2C { i2c } }
+    pub fn new<'a>(i2c : esp_lp_hal::i2c::LpI2c) -> LPI2C<'a> { LPI2C { i2c, phantom: core::marker::PhantomData } }
     /// Write data to the I2C device at the specified address.
     #[cfg(feature = "is-lp-core")]
     pub fn write(&mut self, address : u8, bytes : &[u8]) -> Result<(), LPI2CError> {
@@ -94,7 +96,7 @@ impl LPI2C {
     }
 }
 
-impl MovableObject for LPI2C {
+impl MovableObject for LPI2C<'_> {
     unsafe fn move_to_main(&self, _dest : *mut u8) -> Result<(), EspCoproError> {
         // Do nothing, LPI2C is a zero sized type.
         Ok(())

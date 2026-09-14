@@ -7,7 +7,7 @@
 )]
 
 use esp_alloc as _;
-use esp_hal::rtc_cntl::Rtc;
+use esp_hal::rtc_cntl::sleep::LowPower;
 
 use list_sum_shared::{MainLPParcel, SimpleList};
 
@@ -89,7 +89,7 @@ fn main() -> ! {
         #[cfg(feature = "esp32s3")]
         let wakeupsource = UlpCoreWakeupSource::Timer(esp_hal::ulp_core::UlpCoreTimerCycles::new(0)); // HpCpu;
         delay.delay_millis(1000); // FOR ESP32-S3 because the UART stuck after the HP core wake up without the delay.
-        if let Err(e) = lp_core_code.run_light_sleep(&mut lp_core, wakeupsource, &mut Rtc::new(peripherals.LPWR), &mut parcel) {
+        if let Err(e) = lp_core_code.run_light_sleep(&mut lp_core, wakeupsource, &mut LowPower::new(peripherals.LPWR), &mut parcel) {
             println!("Error running LP core: {}", e);
         }
         println!("result: {} (expected: {})", parcel.result, expected_sum);

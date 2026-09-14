@@ -24,7 +24,7 @@ impl Vector3D {
 
 #[derive(esp_rs_copro_procmacro::MovableObject)]
 pub struct MainLPParcel<'a>{
-    pub i2c : LPI2C,
+    pub i2c : LPI2C<'a>,
     pub button : LPInput<'a, 0>,
     pub steps : usize,
 }

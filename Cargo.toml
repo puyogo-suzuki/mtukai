@@ -1,0 +1,28 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "esp-rs-copro",
+    "esp-rs-copro-procmacro",
+    "examples/*/*",
+]
+
+[workspace.dependencies]
+# ESP-RS-COPRO
+esp-hal     = { version = "=1.2.1", features = ["unstable", "log-04"]}
+esp-lp-hal  = { version = "0.3.0", features = []}
+esp-println = { version = "0.18.0", features = ["log-04"] }
+
+# FOR LP PROJECTS
+embedded-hal = "1.0.0"
+panic-halt = "0.2.0"
+cfg-if = "1.0.3"
+
+# FOR MAIN PROJECTS
+esp-backtrace = { version="0.20.0", features = [
+    "panic-handler",
+    "println",
+] }
+esp-bootloader-esp-idf = { version = "0.6.0" }
+critical-section = "1.2.0"
+esp-alloc = "0.11.0"

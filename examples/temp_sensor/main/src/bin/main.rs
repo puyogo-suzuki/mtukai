@@ -7,10 +7,9 @@
 )]
 
 use esp_alloc as _;
-use esp_hal::gpio::lp_io::LowPowerOutputOpenDrain;
-use esp_hal::i2c::lp_i2c::LpI2c;
-use esp_hal::peripherals::{LP_IO};
-use esp_hal::rtc_cntl::Rtc;
+use esp_hal::i2c::lp_i2c::{LpI2c, Config};
+use esp_hal::peripherals::LP_IO;
+use esp_hal::rtc_cntl::sleep::LowPower;
 use esp_hal::time::Rate;
 use esp_hal::delay::Delay;
 
@@ -47,14 +46,15 @@ fn sht30_main() -> !{
         "../lp/target/riscv32imac-unknown-none-elf/release/temp-sensor-lp"
     );
     {
-        let gpio6 = LowPowerOutputOpenDrain::new(peripherals.GPIO6);
-        let gpio7 = LowPowerOutputOpenDrain::new(peripherals.GPIO7);
-        
-        let i2c = LpI2c::new(
+        let i2c = if let Ok(i2c) = LpI2c::new(
             peripherals.LP_I2C0,
-            gpio6,
-            gpio7,
-            Rate::from_khz(2));
+            Config::default().with_frequency(Rate::from_khz(2)),
+            peripherals.GPIO6,
+            peripherals.GPIO7) {
+            i2c
+        } else {
+            panic!("Failed to create LP I2C");
+        };
 
         let mut parcel = MainLPParcel {
             i2c : LPI2C::new(i2c),
@@ -62,7 +62,7 @@ fn sht30_main() -> !{
             measurement_count : 30
         };
 
-        if let Err(e) = lp_core_code.run_light_sleep(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut Rtc::new(peripherals.LPWR), &mut parcel) {
+        if let Err(e) = lp_core_code.run_light_sleep(&mut lp_core, LpCoreWakeupSource::HpCpu, &mut LowPower::new(peripherals.LPWR), &mut parcel) {
             println!("Error running LP core: {}", e);
         }
         for i in parcel.result.iter() {

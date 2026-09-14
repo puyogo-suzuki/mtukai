@@ -8,19 +8,15 @@ name = "temp-sensor-main"
 path = "./src/bin/main.rs"
 
 [dependencies]
-esp-println = { version="0.17.0", features = ["log-04"] }
-esp-backtrace = { version="0.19.0", features = [
-    "esp32c6",
-    "panic-handler",
-    "println",
-] }
-esp-bootloader-esp-idf = { version = "0.5.0", features = ["esp32c6"] }
-esp-hal                = { version = "=1.1.1", features = ["esp32c6", "unstable", "log-04"] }
+esp-println.workspace = true
+esp-backtrace = { workspace = true, features = ["esp32c6"] }
+esp-bootloader-esp-idf = { workspace = true, features = ["esp32c6"] }
+esp-hal                = { workspace = true, features = ["esp32c6", "unstable", "log-04"] }
 esp-rs-copro           = { path = "../../../esp-rs-copro", features = ["has-lp-core", "esp32c6"] }
 esp-rs-copro-procmacro = { path = "../../../esp-rs-copro-procmacro" , features = ["has-lp-core", "esp32c6"] }
 
-critical-section = "1.2.0"
-esp-alloc = { version = "0.10.0", features = ["esp32c6"] }
+critical-section.workspace = true
+esp-alloc = { workspace = true, features = ["esp32c6"] }
 
 temp-sensor-shared = { path = "../shared" }
 
