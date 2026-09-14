@@ -14,7 +14,7 @@ features = ["is-lp-core", "has-lp-core", "esp32c6"]
 document-features = "0.2"
 object            = { version = "0.37", default-features = false, features = ["read_core", "elf"]}#, optional = true }
 proc-macro-crate  = "3.4"
-proc-macro2       = "1.0"
+proc-macro2       = { version = "1.0", features = ["span-locations"] }
 quote             = "1.0"
 syn               = { version = "3.0", features = ["extra-traits", "full"] }
 termcolor         = "1.4"

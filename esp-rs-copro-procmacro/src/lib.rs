@@ -218,11 +218,43 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
 
     let elf_file = args.path.value();
 
-    if !Path::new(&elf_file).exists() {
-        return Error::new(Span::call_site().into(), "File not found")
-            .to_compile_error()
-            .into();
-    }
+    let elf_file = {
+        let elf_file = Path::new(&elf_file);
+        if elf_file.exists() {
+            Ok(elf_file.to_path_buf())
+        } else if let Ok(cargo_manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+            let full_path = Path::new(&cargo_manifest_dir).join(&elf_file);
+            if full_path.exists() {
+                Ok(full_path)
+            } else {
+                let src_path = proc_macro2::Span::call_site().file();
+                let full_path = Path::new(&src_path).join(&elf_file);
+                if full_path.exists() {
+                    Ok(full_path)
+                } else {
+                    Err(elf_file)
+                }
+            }
+        } else {
+            Err(elf_file)
+        }
+    };
+    let elf_file = {
+        match elf_file {
+            Ok(path) => path,
+            Err(path) => {
+                return Error::new(
+                    args.path.span(),
+                    format!(
+                        "ELF file not found: {}. Please check the path and ensure the file exists.",
+                        path.display()
+                    ),
+                )
+                .to_compile_error()
+                .into();
+            }
+        }
+    };
 
     let bin_data = fs::read(elf_file).unwrap();
     let obj_file = File::parse(&*bin_data).unwrap();
@@ -264,7 +296,6 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         )
         .to_compile_error().into();
     }
-
 
     for section in sections {
         if section.address() > last_address {
