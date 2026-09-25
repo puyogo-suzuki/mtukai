@@ -163,6 +163,8 @@ pub mod collections;
 pub mod prelude;
 #[cfg(not(feature = "is-lp-core"))]
 mod addresstranslation;
+#[cfg(not(any(not(feature = "nottest"), feature = "esp32s3")))]
+pub mod lpmutex;
 
 /// This represents an error that can occur during the transfer of a value between the main and the LP coprocessors.
 #[derive(Debug, Hash, Clone, Copy, Eq, PartialEq)]

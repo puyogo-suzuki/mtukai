@@ -14,6 +14,11 @@ features = ["is-lp-core", "has-lp-core", "esp32c6", "esp32s3", "move_on_need"]
 esp-println = { workspace = true, optional = true }
 esp-lp-hal = { workspace = true, optional = true }
 esp-hal = { workspace = true, optional = true }
+esp-sync = { workspace = true, optional = true }
+embassy-sync-06 = { package = "embassy-sync", version = "0.6", optional = true }
+embassy-sync-07 = { package = "embassy-sync", version = "0.7", optional = true }
+embassy-sync-08 = { package = "embassy-sync", version = "0.8", optional = true }
+riscv = { version = ">=0.15.0", optional = true }
 
 [dev-dependencies]
 esp-rs-copro-procmacro = { path = "../esp-rs-copro-procmacro", features=[] }
@@ -23,8 +28,8 @@ rand = "0.10.0"
 default = []
 nottest = []
 is-lp-core = ["dep:esp-lp-hal", "nottest"]
-has-lp-core = ["dep:esp-println", "dep:esp-hal", "nottest"]
-esp32c6 = ["esp-lp-hal?/esp32c6", "esp-hal?/esp32c6", "esp-println?/esp32c6"]
-esp32s3 = ["esp-lp-hal?/esp32s3", "esp-hal?/esp32s3", "esp-println?/esp32s3"]
+has-lp-core = ["dep:esp-println", "dep:esp-hal", "dep:esp-sync", "dep:embassy-sync-06", "dep:embassy-sync-07", "dep:embassy-sync-08", "nottest"]
+esp32c6 = ["esp-lp-hal?/esp32c6", "esp-hal?/esp32c6", "esp-println?/esp32c6", "esp-sync?/esp32c6", "dep:riscv"]
+esp32s3 = ["esp-lp-hal?/esp32s3", "esp-hal?/esp32s3", "esp-println?/esp32s3", "esp-sync?/esp32s3"]
 custom_range = []
 move_on_need = []
