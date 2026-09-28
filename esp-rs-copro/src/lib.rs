@@ -201,6 +201,29 @@ pub fn try_copro_lock() -> Result<(), EspCoproError> {
     Ok(())
 }
 
+#[cfg(all(feature = "has-lp-core", feature = "esp32c6"))]
+static COPY_ARCS : core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::new(false);
+
+#[cfg(all(feature = "has-lp-core", feature = "esp32c6"))]
+pub fn exclusive_execution_start() {
+    COPY_ARCS.store(true, core::sync::atomic::Ordering::Relaxed);
+}
+#[cfg(all(feature = "has-lp-core", feature = "esp32c6"))]
+pub fn exclusive_execution_end() {
+    COPY_ARCS.store(false, core::sync::atomic::Ordering::Relaxed);
+}
+
+pub(crate) fn is_copy_arcs() -> bool {
+    #[cfg(all(feature = "has-lp-core", feature = "esp32c6"))]
+    {
+        COPY_ARCS.load(core::sync::atomic::Ordering::Relaxed)
+    }
+    #[cfg(not(all(feature = "has-lp-core", feature = "esp32c6")))]
+    {
+        true
+    }
+}
+
 /// This is for internal-use.
 /// Release the lock for the LP coprocessor. This should be called after you finish using the LP coprocessor.
 /// If the MCU does not support atomic operations, this function does nothing.

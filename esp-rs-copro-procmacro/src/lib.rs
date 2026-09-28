@@ -47,7 +47,17 @@ pub fn esp_rs_copro_statics(_attr: TokenStream) -> TokenStream {
     }};
     let export_name = format!("__COPRO_ALLOCATOR_{}", heap_size);
     let export_name_lit = Literal::string(&export_name);
+    let deallocfunc = if cfg!(feature = "esp32c6") {
+        quote! {
+        #[unsafe(export_name="__COPRO_MAIN_DEALLOC")]
+        static mut MAIN_DEALLOC_FUNC : fn(ptr: *mut u8, layout: core::alloc::Layout) -> () = |_, _| {};
+        pub extern "Rust" fn __lpcoproc_main_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
+            unsafe { MAIN_DEALLOC_FUNC(ptr, layout); }
+        }
+        }
+    } else { quote!{} };
     let expanded = quote! {
+        #deallocfunc
         #[unsafe(export_name="__COPRO_TRANSFER")]
         static mut TRANSFER : [usize; 2] = [0; 2];
         #[used]
@@ -208,7 +218,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
     
     let copro_crate_use = if let Ok(FoundCrate::Name(ref name)) = crate_name("esp-rs-copro") {
         let ident = Ident::new(name, Span::call_site().into());
-        quote!{ use #ident ::{ lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject, movableobjectwrapper::*, EspCoproError, try_copro_lock, copro_unlock}; }
+        quote!{ use #ident ::{ lpbox::LPBox, lpalloc::ImplLPAllocator, movableobject::MovableObject, movableobjectwrapper::*, EspCoproError, try_copro_lock, copro_unlock, exclusive_execution_start, exclusive_execution_end}; }
     } else { quote!{} };
 
     let args: LoadLpArgs = match syn::parse(input) {
@@ -410,6 +420,15 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         #transfer
     }} else {quote!{}};
 
+    let set_dealloc_func = if let Some(dealloc_sym) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_MAIN_DEALLOC")) {
+        let addr = dealloc_sym.address() as u32;
+        quote!{
+            unsafe { (#addr as *mut fn(ptr: *mut u8, layout: core::alloc::Layout) -> ()).write_volatile(|ptr, layout| {
+                unsafe { alloc::alloc:dealloc(ptr, layout); }
+            }); }
+        }
+    } else {quote!{}};
+
     let copy_dest = if let Some(lp_start) = args.lp_start {
         quote! { (#lp_start as *mut u8) }
     } else {
@@ -459,12 +478,15 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                     transfer_value : &mut T,
                     #(_: #run_light_sleep_args),*
                 ) -> Result<(), EspCoproError> {
+                    #set_dealloc_func;
                     try_copro_lock()?;
+                    exclusive_execution_start();
                     #alloccall
                     #enable_wakeup
                     lp_core.run(wakeup_source);
                     lpwr.sleep_light(RtcSleepConfig::default());
                     #transfer_back;
+                    exclusive_execution_end();
                     copro_unlock();
                     Ok(())
                 }

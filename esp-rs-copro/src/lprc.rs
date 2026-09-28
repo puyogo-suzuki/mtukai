@@ -9,6 +9,26 @@ use std::alloc;
 
 use crate::{EspCoproError, lpalloc::{self, address_translate_to_lp}, lpbox::{self, lpbox_alloc}, movableobject::MovableObject};
 
+#[cfg(all(feature = "is-lp-core", feature = "esp32c6"))]
+unsafe extern "Rust" {
+    #[link_name = "__lpcoproc_main_dealloc"]
+    pub(crate) fn main_dealloc(ptr: * mut u8, layout: Layout);
+}
+mod rcstatic {
+    #[cfg(all(feature = "has-lp-core", feature = "esp32c6"))]
+    fn dealloc_auto(ptr: *mut u8, layout: core::alloc::Layout) {
+        crate::lpbox::lp_dealloc(ptr, layout);
+    }
+    #[cfg(all(feature = "is-lp-core", feature = "esp32c6"))]
+    fn dealloc_auto(ptr: *mut u8, layout: core::alloc::Layout) {
+        if crate::lpalloc::in_lp_mem_range(ptr) {
+            unsafe { alloc::alloc::dealloc(ptr, layout); }
+        } else {
+            unsafe { super::main_dealloc(ptr, layout); }
+        }
+    }
+}
+
 /// A minimal shared-owner pointer for data stored in the same memory domain as [`LPBox<T>`].
 ///
 /// This is intentionally a small, conservative implementation. The current translation table in
@@ -803,7 +823,11 @@ impl<T: ?Sized + MovableObject> MovableObject for LPWeak<T> {
     #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
-            (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_main_inner(self.get_inner())?))
+            if crate::is_copy_arcs() {
+                (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_main_inner(self.get_inner())?))
+            } else {
+                copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
+            }
         }
         Ok(())
     }
@@ -815,7 +839,11 @@ impl<T: ?Sized + MovableObject> MovableObject for LPWeak<T> {
     #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
-            (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_lp_inner(self.get_inner())?))
+            if crate::is_copy_arcs() {
+                (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_lp_inner(self.get_inner())?))
+            } else {
+                copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
+            }
         }
         Ok(())
     }
@@ -830,7 +858,11 @@ impl<T: ?Sized + MovableObject> MovableObject for LPAWeak<T> {
     #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
-            (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_main_ainner(self.get_inner())?))
+            if crate::is_copy_arcs() {
+                (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_main_ainner(self.get_inner())?))
+            } else {
+                copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
+            }
         }
         Ok(())
     }
@@ -842,7 +874,11 @@ impl<T: ?Sized + MovableObject> MovableObject for LPAWeak<T> {
     #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
-            (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_lp_ainner(self.get_inner())?))
+            if crate::is_copy_arcs() {
+                (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_lp_ainner(self.get_inner())?))
+            } else {
+                copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
+            }
         }
         Ok(())
     }
@@ -856,7 +892,11 @@ impl<T: ?Sized + MovableObject> MovableObject for LPRc<T> {
     #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
-            (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_main_inner(self.get_inner())?))
+            if crate::is_copy_arcs() {
+                (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_main_inner(self.get_inner())?))
+            } else {
+                copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
+            }
         }
         Ok(())
     }
@@ -868,7 +908,11 @@ impl<T: ?Sized + MovableObject> MovableObject for LPRc<T> {
     #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
-            (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_lp_inner(self.get_inner())?))
+            if crate::is_copy_arcs() {
+                (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_lp_inner(self.get_inner())?))
+            } else {
+                copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
+            }
         }
         Ok(())
     }
@@ -883,7 +927,11 @@ impl<T: ?Sized + MovableObject> MovableObject for LPArc<T> {
     #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
-            (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_main_ainner(self.get_inner())?))
+            if crate::is_copy_arcs() {
+                (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_main_ainner(self.get_inner())?))
+            } else {
+                copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
+            }
         }
         Ok(())
     }
@@ -895,7 +943,11 @@ impl<T: ?Sized + MovableObject> MovableObject for LPArc<T> {
     #[cfg(not(feature = "is-lp-core"))]
     unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
-            (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_lp_ainner(self.get_inner())?))
+            if crate::is_copy_arcs() {
+                (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_lp_ainner(self.get_inner())?))
+            } else {
+                copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
+            }
         }
         Ok(())
     }
