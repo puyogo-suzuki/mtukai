@@ -48,42 +48,11 @@ fn get_vtable(obj: &dyn MovableObject) -> *const u8 {
     }
 }
 
-pub(crate) fn lpbox_alloc(l : core::alloc::Layout) -> *mut u8 {
-    unsafe {
-        let ptr = alloc::alloc(l);
-        if ptr.is_null() { alloc::handle_alloc_error(l); }
-        ptr
-    }
-}
-
-pub(crate) fn lpbox_realloc(ptr : * mut u8, old_layout : core::alloc::Layout, new_size : usize) -> * mut u8 {
-    unsafe {
-        let new_ptr = alloc::realloc(ptr, old_layout, new_size);
-        if new_ptr.is_null() { alloc::handle_alloc_error(old_layout); }
-        new_ptr
-    }
-}
-
-#[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
-pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
-    unsafe {
-        if lpalloc::in_lp_mem_range(ptr) {
-            lpalloc::lp_allocator_dealloc(ptr, layout); // lp coprocessor
-        } else {
-            alloc::dealloc(ptr, layout); // main processor
-        }
-    }
-}
-#[cfg(feature = "is-lp-core")]
-pub(crate) fn lp_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
-    unsafe{ alloc::dealloc(ptr, layout); } // main processor
-}
-
 #[cfg(feature = "has-lp-core")]
 pub(crate) mod lpbox_static {
     // WE ASUME THAT lpbox_static IS ONLY USED ON SINGLE THREADED PROGRAMS.
     use crate::addresstranslation::{AddressTranslationEntry, AddressTranslationTable, AddressTranslationAddressValue};
-    use core::{alloc::Layout, cell::UnsafeCell};
+    use core::cell::UnsafeCell;
 
     static ADDRESS_TRANSLATION_TABLE : SyncUnsafeCell<AddressTranslationTable> =
         SyncUnsafeCell::new(AddressTranslationTable::new());
@@ -137,7 +106,6 @@ pub(crate) mod lpbox_static {
 pub(crate) mod lpbox_static {
     use crate::addresstranslation::{AddressTranslationAddressValue, AddressTranslationEntry, AddressTranslationTable};
     use core::cell::{RefCell, Cell};
-    use std::alloc::Layout;
 
     thread_local! {
         pub(crate) static ADDRESS_TRANSLATION_TABLE : RefCell<AddressTranslationTable> =
@@ -210,7 +178,7 @@ impl<T: MovableObject> LPBox<T> {
         if T::IS_ZST {
             LPBox(NonNull::<T>::dangling())
         } else {
-            let ptr = lpbox_alloc(core::alloc::Layout::new::<T>()) as *mut T;
+            let ptr = lpalloc::alloc_auto(core::alloc::Layout::new::<T>()) as *mut T;
             ptr.write(value);
             #[cfg(all(feature = "move_on_need", feature = "is-lp-core"))]
             lpalloc::write_vtable(ptr as * mut u8, get_vtable(ptr.as_ref().unwrap()) as * mut u8);
@@ -325,10 +293,10 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
                     entry.address.get_addr() as * mut u8
                 } else {
                     alloc::dealloc(entry.address.get_addr() as * mut u8, entry.address.get_layout());
-                    lpbox_alloc(my_layout)
+                    lpalloc::alloc_auto(my_layout)
                 }
             } else {
-                lpbox_alloc(my_layout)
+                lpalloc::alloc_auto(my_layout)
             };
         if addr.is_null() { return Err(EspCoproError::OutOfMemory); }
         value.move_to_main(addr)?;
@@ -432,7 +400,7 @@ impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
         let ptr = self.as_ptr() as * mut u8;
         let lay = unsafe {core::alloc::Layout::for_value(self.0.as_ref())};
         if lay.size() != 0 {
-            lp_dealloc(ptr, lay);
+            lpalloc::dealloc_auto(ptr, lay);
         }
     }
     #[cfg(feature = "is-lp-core")]

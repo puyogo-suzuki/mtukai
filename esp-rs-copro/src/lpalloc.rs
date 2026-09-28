@@ -1,5 +1,55 @@
 use core::{alloc::{GlobalAlloc, Layout}, cell::UnsafeCell, mem::MaybeUninit, ptr::{null_mut, NonNull}};
 
+#[cfg(not(feature="nottest"))]
+use std::alloc;
+
+#[cfg(feature="nottest")]
+use alloc::alloc;
+
+#[cfg(all(feature = "is-lp-core", feature = "esp32c6"))]
+unsafe extern "Rust" {
+    #[link_name = "__lpcoproc_main_dealloc"]
+    pub(crate) fn main_dealloc(ptr: * mut u8, layout: Layout);
+}
+
+#[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
+pub(crate) fn dealloc_auto(ptr: * mut u8, layout: core::alloc::Layout) {
+    unsafe {
+        if in_lp_mem_range(ptr) {
+            lp_allocator_dealloc(ptr, layout); // lp coprocessor
+        } else {
+            alloc::dealloc(ptr, layout); // main processor
+        }
+    }
+}
+#[cfg(feature = "is-lp-core")]
+pub(crate) fn dealloc_auto(ptr: * mut u8, layout: core::alloc::Layout) {
+    #[cfg(not(feature = "esp32c6"))]
+    unsafe{ alloc::dealloc(ptr, layout); } // main processor
+    #[cfg(feature = "esp32c6")]
+    if in_lp_mem_range(ptr) {
+        unsafe { alloc::dealloc(ptr, layout); }
+    } else {
+        unsafe { main_dealloc(ptr, layout); }
+    }
+}
+
+pub(crate) fn alloc_auto(l : core::alloc::Layout) -> *mut u8 {
+    unsafe {
+        let ptr = alloc::alloc(l);
+        if ptr.is_null() { alloc::handle_alloc_error(l); }
+        ptr
+    }
+}
+
+pub(crate) fn realloc_auto(ptr : * mut u8, old_layout : core::alloc::Layout, new_size : usize) -> * mut u8 {
+    unsafe {
+        let new_ptr = alloc::realloc(ptr, old_layout, new_size);
+        if new_ptr.is_null() { alloc::handle_alloc_error(old_layout); }
+        new_ptr
+    }
+}
+
 /// An LP allocator implementation using a simple linked list of free blocks.
 /// This is used for the LP coprocessor to support dynamic memory allocation.
 /// Beacuse we must share information about allocation, this allocator is implemented as a struct, and the global allocator functions are just wrappers around it.

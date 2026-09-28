@@ -4,7 +4,7 @@
 /// https://github.com/rust-lang/rust
 
 use core::{alloc::Layout, slice, fmt, iter, marker::PhantomData, mem::{self, ManuallyDrop, MaybeUninit, SizedTypeProperties}, ops::{Index, IndexMut, Range, RangeBounds}, ptr::{self, NonNull, Unique}, slice::SliceIndex};
-use crate::{EspCoproError, lpadapter::LPAdapter, lpalloc::{address_translate_to_lp, address_translate_to_main}, lpbox::LPBox, movableobject::MovableObject, collections::lpdrain::LPDrain};
+use crate::{EspCoproError, lpadapter::LPAdapter, lpalloc::{address_translate_to_lp, address_translate_to_main, self}, lpbox::LPBox, movableobject::MovableObject, collections::lpdrain::LPDrain};
 
 #[cfg(feature = "nottest")]
 use ::alloc::{alloc, boxed::Box, vec::Vec};
@@ -118,7 +118,7 @@ impl LPVecInner {
     fn deallocate(&mut self, elem_layout : Layout) {
         let layout = unsafe { self.current_memory(elem_layout) };
         if layout.size() == 0 { return; }
-        crate::lpbox::lp_dealloc(address_translate_to_main(self.ptr.as_ptr()), layout);
+        crate::lpalloc::dealloc_auto(address_translate_to_main(self.ptr.as_ptr()), layout);
     }
 
     const unsafe fn from_raw_parts(ptr : * mut u8, capacity : usize) -> Self {
@@ -1010,7 +1010,7 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
                 crate::lpbox::lpbox_static::remove_by_lp(src as * const [T] as * const () as usize)
                 .map_or_else(|| {
                     let lay = core::alloc::Layout::for_value(src);
-                    crate::lpbox::lpbox_alloc(lay) as usize
+                    lpalloc::alloc_auto(lay) as usize
                 },
                 |a| {
                     let addr = a.address.get_addr();
@@ -1018,7 +1018,7 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
                     // Check the layout is unmodified.
                     if lay != core::alloc::Layout::for_value(src) {
                         // extend the main's.
-                        crate::lpbox::lpbox_realloc(addr as * mut u8, lay, core::alloc::Layout::for_value(src).size()) as usize
+                        lpalloc::realloc_auto(addr as * mut u8, lay, core::alloc::Layout::for_value(src).size()) as usize
                     } else {
                         addr
                     }

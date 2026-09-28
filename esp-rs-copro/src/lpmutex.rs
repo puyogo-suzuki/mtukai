@@ -2,8 +2,9 @@
 use esp_sync::{raw::{SingleCoreInterruptLock, RawLock}, RestoreState};
 use crate::{movableobject::MovableObject, EspCoproError};
 
-use core::{cell::UnsafeCell, marker::PhantomData};
-use core::ptr::copy_nonoverlapping;
+use core::{cell::UnsafeCell, ptr::copy_nonoverlapping};
+#[cfg(feature = "is-lp-core")]
+use core::marker::PhantomData;
 
 // Some parts of code are imported from https://github.com/esp-rs/esp-hal/blob/0fed45c84c0723ed4e0b7d19c7f3078ed79090c6/esp-sync/src/lib.rs
 

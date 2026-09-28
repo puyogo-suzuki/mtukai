@@ -8,7 +8,7 @@ license = "Apache-2.0 OR MIT"
 panic = 'abort'
 
 [package.metadata.docs.rs]
-features = ["is-lp-core", "has-lp-core", "esp32c6", "esp32s3", "move_on_need"]
+features = ["is-lp-core", "has-lp-core", "esp32c6", "esp32s3", "move_on_need", "parallel_run"]
 
 [dependencies]
 esp-println = { workspace = true, optional = true }

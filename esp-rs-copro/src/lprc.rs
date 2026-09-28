@@ -1,33 +1,20 @@
 use core::{
-    alloc::Layout, cell::Cell, marker::PhantomData, mem::Alignment, num::NonZero, ops::Deref, ptr::{NonNull, copy_nonoverlapping}, sync::atomic::{AtomicUsize, Ordering},
+    alloc::Layout, cell::Cell, marker::PhantomData, mem::Alignment, ops::Deref, ptr::NonNull, sync::atomic::{AtomicUsize, Ordering}
 };
 
-#[cfg(feature = "nottest")]
-use alloc::alloc;
-#[cfg(not(feature = "nottest"))]
+#[cfg(not(feature="is-lp-core"))]
+use core::{ptr::copy_nonoverlapping, num::NonZero};
+
+use crate::{EspCoproError, lpalloc, lpbox, movableobject::MovableObject};
+
+#[cfg(not(feature="nottest"))]
+use crate::{lpalloc::address_translate_to_lp};
+
+#[cfg(not(feature="nottest"))]
 use std::alloc;
 
-use crate::{EspCoproError, lpalloc::{self, address_translate_to_lp}, lpbox::{self, lpbox_alloc}, movableobject::MovableObject};
-
-#[cfg(all(feature = "is-lp-core", feature = "esp32c6"))]
-unsafe extern "Rust" {
-    #[link_name = "__lpcoproc_main_dealloc"]
-    pub(crate) fn main_dealloc(ptr: * mut u8, layout: Layout);
-}
-mod rcstatic {
-    #[cfg(all(feature = "has-lp-core", feature = "esp32c6"))]
-    fn dealloc_auto(ptr: *mut u8, layout: core::alloc::Layout) {
-        crate::lpbox::lp_dealloc(ptr, layout);
-    }
-    #[cfg(all(feature = "is-lp-core", feature = "esp32c6"))]
-    fn dealloc_auto(ptr: *mut u8, layout: core::alloc::Layout) {
-        if crate::lpalloc::in_lp_mem_range(ptr) {
-            unsafe { alloc::alloc::dealloc(ptr, layout); }
-        } else {
-            unsafe { super::main_dealloc(ptr, layout); }
-        }
-    }
-}
+#[cfg(feature="nottest")]
+use alloc::alloc;
 
 /// A minimal shared-owner pointer for data stored in the same memory domain as [`LPBox<T>`].
 ///
@@ -248,7 +235,7 @@ impl<T: ?Sized + MovableObject> Drop for LPWeak<T> {
             inner.weak.set(previous_weak.saturating_sub(1));
             if previous_weak == 1 && inner.get_strong() == 0 {
                 // Last weak reference; check if strong is also 0
-                lpbox::lp_dealloc(inner as *const Inner<T> as *mut u8, Layout::for_value_raw(inner));
+                crate::lpalloc::dealloc_auto(inner as *const Inner<T> as *mut u8, Layout::for_value_raw(inner));
             }
         }
     }
@@ -263,7 +250,7 @@ impl<T: ?Sized + MovableObject> Drop for LPAWeak<T> {
             let previous_weak = inner.weak.fetch_sub(1, Ordering::Release);
             if previous_weak == 1 && inner.get_strong() == 0 {
                 // Last weak reference; check if strong is also 0
-                lpbox::lp_dealloc(inner as *const AInner<T> as *mut u8, Layout::for_value_raw(inner));
+                crate::lpalloc::dealloc_auto(inner as *const AInner<T> as *mut u8, Layout::for_value_raw(inner));
             }
         }
     }
@@ -431,7 +418,7 @@ impl<T: MovableObject> LPRc<T> {
     /// The value is allocated on the main memory on the main processor, and is allocated on the LP memory on the LP coprocessor.
     /// The ownership is transferred to the caller.
     pub fn new(value: T) -> Self { unsafe {
-        let ptr = lpbox_alloc(Layout::new::<Inner<T>>()) as *mut Inner<T>;
+        let ptr = lpalloc::alloc_auto(Layout::new::<Inner<T>>()) as *mut Inner<T>;
         ptr.write(Inner {
             strong: Cell::new(1),
             weak: Cell::new(1),
@@ -484,7 +471,7 @@ impl<T: MovableObject> LPArc<T> {
     /// The value is allocated on the main memory on the main processor, and is allocated on the LP memory on the LP coprocessor.
     /// The ownership is transferred to the caller.
     pub fn new(value: T) -> Self { unsafe {
-        let ptr = lpbox_alloc(Layout::new::<AInner<T>>()) as *mut AInner<T>;
+        let ptr = lpalloc::alloc_auto(Layout::new::<AInner<T>>()) as *mut AInner<T>;
         ptr.write(AInner {
             strong: AtomicUsize::new(1),
             weak: AtomicUsize::new(1),
@@ -587,7 +574,7 @@ impl<T: ?Sized + MovableObject> Drop for LPRc<T> {
                 if previous_weak == 1 {
                     // No more weak references, so deallocate Inner
                     let layout = Layout::for_value(inner);
-                    lpbox::lp_dealloc(inner as *const Inner<T> as *mut u8, layout);
+                    crate::lpalloc::dealloc_auto(inner as *const Inner<T> as *mut u8, layout);
                 }
             }
         }
@@ -609,7 +596,7 @@ impl<T: ?Sized + MovableObject> Drop for LPArc<T> {
                 if previous_weak == 1 {
                     // No more weak references, so deallocate Inner
                     let layout = Layout::for_value(inner);
-                    lpbox::lp_dealloc(inner as *const AInner<T> as *mut u8, layout);
+                    crate::lpalloc::dealloc_auto(inner as *const AInner<T> as *mut u8, layout);
                 }
             }
         }
@@ -742,7 +729,7 @@ fn impl_move_to_main(src: *const u8, layout: Layout) -> Result<(bool, NonNull<u8
         inner
     } else {
         // If not found, allocate a new one in main memory
-        let addr = lpbox::lpbox_alloc(layout);
+        let addr = lpalloc::alloc_auto(layout);
         if addr.is_null() { return Err(EspCoproError::OutOfMemory); }
         lpbox::lpbox_static::insert_no_drop_copied(addr, src  as usize);
         unsafe { NonNull::new_unchecked(addr) }
