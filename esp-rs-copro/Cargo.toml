@@ -8,7 +8,7 @@ license = "Apache-2.0 OR MIT"
 panic = 'abort'
 
 [package.metadata.docs.rs]
-features = ["is-lp-core", "has-lp-core", "esp32c6", "esp32s3", "move_on_need", "parallel_run"]
+features = ["is-lp-core", "has-lp-core", "esp32c6", "esp32s3", "move_on_need"]
 
 [dependencies]
 esp-println = { workspace = true, optional = true }
@@ -33,3 +33,4 @@ esp32c6 = ["esp-lp-hal?/esp32c6", "esp-hal?/esp32c6", "esp-println?/esp32c6", "e
 esp32s3 = ["esp-lp-hal?/esp32s3", "esp-hal?/esp32s3", "esp-println?/esp32s3", "esp-sync?/esp32s3"]
 custom_range = []
 move_on_need = []
+parallel-run = []

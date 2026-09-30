@@ -286,3 +286,9 @@ pub mod transfer_functions {
         Ok(())
     }
 }
+
+#[cfg(all(feature = "parallel-run", feature = "esp32s3"))]
+compile_error!("Parallel run on ESP32-S3 is not supported!");
+
+#[cfg(all(feature = "parallel-run", not(feature = "nottest")))]
+compile_error!("Parallel run on test is not supported!");

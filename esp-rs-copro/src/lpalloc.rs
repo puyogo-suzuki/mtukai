@@ -6,10 +6,14 @@ use std::alloc;
 #[cfg(feature="nottest")]
 use alloc::alloc;
 
-#[cfg(all(feature = "is-lp-core", feature = "esp32c6"))]
+#[cfg(all(feature = "is-lp-core", feature = "parallel-run"))]
 unsafe extern "Rust" {
     #[link_name = "__lpcoproc_main_dealloc"]
     pub(crate) fn main_dealloc(ptr: * mut u8, layout: Layout);
+    #[link_name = "__lpcoproc_main_realloc"]
+    pub(crate) fn main_realloc(ptr: * mut u8, old_layout: Layout, new_size : usize) -> * mut u8;
+    #[link_name = "__lpcoproc_main_alloc"]
+    pub(crate) fn main_alloc(ptr: * mut u8, layout: Layout) -> * mut u8;
 }
 
 #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
@@ -24,9 +28,9 @@ pub(crate) fn dealloc_auto(ptr: * mut u8, layout: core::alloc::Layout) {
 }
 #[cfg(feature = "is-lp-core")]
 pub(crate) fn dealloc_auto(ptr: * mut u8, layout: core::alloc::Layout) {
-    #[cfg(not(feature = "esp32c6"))]
+    #[cfg(not(feature = "parallel-run"))]
     unsafe{ alloc::dealloc(ptr, layout); } // main processor
-    #[cfg(feature = "esp32c6")]
+    #[cfg(feature = "parallel-run")]
     if in_lp_mem_range(ptr) {
         unsafe { alloc::dealloc(ptr, layout); }
     } else {
@@ -34,7 +38,18 @@ pub(crate) fn dealloc_auto(ptr: * mut u8, layout: core::alloc::Layout) {
     }
 }
 
-pub(crate) fn alloc_auto(l : core::alloc::Layout) -> *mut u8 {
+// pub(crate) fn alloc_auto(l : core::alloc::Layout, parent_pointer: *const u8) -> *mut u8 {
+//     unsafe {
+//         #[cfg(feature = "parallel-run")]
+//         let ptr = if in_lp_mem_range(parent_pointer) {
+//             alloc::alloc(l)
+//         } else {
+//             main_alloc(l)
+//         };
+//     }
+// }
+
+pub(crate) fn alloc_on_me(l : core::alloc::Layout) -> *mut u8 {
     unsafe {
         let ptr = alloc::alloc(l);
         if ptr.is_null() { alloc::handle_alloc_error(l); }
@@ -42,6 +57,23 @@ pub(crate) fn alloc_auto(l : core::alloc::Layout) -> *mut u8 {
     }
 }
 
+#[cfg(feature = "is-lp-core")]
+pub(crate) fn realloc_auto(ptr : * mut u8, old_layout : core::alloc::Layout, new_size : usize) -> * mut u8 {
+    unsafe {
+        #[cfg(feature = "parallel-run")]
+        let ptr = if in_lp_mem_range(parent_pointer) {
+            alloc::realloc(ptr, old_layout, new_size)
+        } else {
+            main_realloc(ptr, old_layout, new_size)
+        };
+        #[cfg(not(feature = "parallel-run"))]
+        let new_ptr = alloc::realloc(ptr, old_layout, new_size);
+        if new_ptr.is_null() { alloc::handle_alloc_error(old_layout); }
+        new_ptr
+    }
+}
+
+#[cfg(feature = "has-lp-core")]
 pub(crate) fn realloc_auto(ptr : * mut u8, old_layout : core::alloc::Layout, new_size : usize) -> * mut u8 {
     unsafe {
         let new_ptr = alloc::realloc(ptr, old_layout, new_size);

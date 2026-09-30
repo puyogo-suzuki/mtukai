@@ -418,7 +418,7 @@ impl<T: MovableObject> LPRc<T> {
     /// The value is allocated on the main memory on the main processor, and is allocated on the LP memory on the LP coprocessor.
     /// The ownership is transferred to the caller.
     pub fn new(value: T) -> Self { unsafe {
-        let ptr = lpalloc::alloc_auto(Layout::new::<Inner<T>>()) as *mut Inner<T>;
+        let ptr = lpalloc::alloc_on_me(Layout::new::<Inner<T>>()) as *mut Inner<T>;
         ptr.write(Inner {
             strong: Cell::new(1),
             weak: Cell::new(1),
@@ -471,7 +471,7 @@ impl<T: MovableObject> LPArc<T> {
     /// The value is allocated on the main memory on the main processor, and is allocated on the LP memory on the LP coprocessor.
     /// The ownership is transferred to the caller.
     pub fn new(value: T) -> Self { unsafe {
-        let ptr = lpalloc::alloc_auto(Layout::new::<AInner<T>>()) as *mut AInner<T>;
+        let ptr = lpalloc::alloc_on_me(Layout::new::<AInner<T>>()) as *mut AInner<T>;
         ptr.write(AInner {
             strong: AtomicUsize::new(1),
             weak: AtomicUsize::new(1),
@@ -729,7 +729,7 @@ fn impl_move_to_main(src: *const u8, layout: Layout) -> Result<(bool, NonNull<u8
         inner
     } else {
         // If not found, allocate a new one in main memory
-        let addr = lpalloc::alloc_auto(layout);
+        let addr = lpalloc::alloc_on_me(layout);
         if addr.is_null() { return Err(EspCoproError::OutOfMemory); }
         lpbox::lpbox_static::insert_no_drop_copied(addr, src  as usize);
         unsafe { NonNull::new_unchecked(addr) }

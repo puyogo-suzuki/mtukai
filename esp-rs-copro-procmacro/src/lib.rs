@@ -47,12 +47,22 @@ pub fn esp_rs_copro_statics(_attr: TokenStream) -> TokenStream {
     }};
     let export_name = format!("__COPRO_ALLOCATOR_{}", heap_size);
     let export_name_lit = Literal::string(&export_name);
-    let deallocfunc = if cfg!(feature = "esp32c6") {
+    let deallocfunc = if cfg!(all(feature = "esp32c6", feature = "parallel-run")) {
         quote! {
+        #[unsafe(export_name="__COPRO_MAIN_ALLOC")]
+        static mut MAIN_ALLOC_FUNC : fn(layout: core::alloc::Layout) -> * mut u8 = |_, _| {};
+        pub extern "Rust" fn __lpcoproc_main_alloc(layout: core::alloc::Layout) {
+            unsafe { MAIN_ALLOC_FUNC(layout) }
+        }
         #[unsafe(export_name="__COPRO_MAIN_DEALLOC")]
         static mut MAIN_DEALLOC_FUNC : fn(ptr: *mut u8, layout: core::alloc::Layout) -> () = |_, _| {};
         pub extern "Rust" fn __lpcoproc_main_dealloc(ptr: * mut u8, layout: core::alloc::Layout) {
             unsafe { MAIN_DEALLOC_FUNC(ptr, layout); }
+        }
+        #[unsafe(export_name="__COPRO_MAIN_REALLOC")]
+        static mut MAIN_REALLOC_FUNC : fn(ptr: *mut u8, layout: core::alloc::Layout) -> * mut u8 = |_, _| {};
+        pub extern "Rust" fn __lpcoproc_main_realloc(ptr: * mut u8, layout: core::alloc::Layout) {
+            unsafe { MAIN_REALLOC_FUNC(ptr, layout) }
         }
         }
     } else { quote!{} };
@@ -420,14 +430,31 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
         #transfer
     }} else {quote!{}};
 
-    let set_dealloc_func = if let Some(dealloc_sym) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_MAIN_DEALLOC")) {
-        let addr = dealloc_sym.address() as u32;
-        quote!{
-            unsafe { (#addr as *mut fn(ptr: *mut u8, layout: core::alloc::Layout) -> ()).write_volatile(|ptr, layout| {
-                unsafe { alloc::alloc:dealloc(ptr, layout); }
+    let mut set_alloc_func = quote!{};
+    if let Some(alloc_sym) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_MAIN_ALLOC")) {
+        let addr = alloc_sym.address() as u32;
+        set_alloc_func = quote!{
+            unsafe { (#addr as *mut fn(layout: core::alloc::Layout) -> * mut u8).write_volatile(|layout| {
+                unsafe { alloc::alloc(layout) }
             }); }
-        }
-    } else {quote!{}};
+        };
+    }
+    if let Some(dealloc_sym) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_MAIN_DEALLOC")) {
+        let addr = dealloc_sym.address() as u32;
+        set_alloc_func.extend(quote!{
+            unsafe { (#addr as *mut fn(ptr: *mut u8, layout: core::alloc::Layout) -> ()).write_volatile(|ptr, layout| {
+                unsafe { alloc::dealloc(ptr, layout); }
+            }); }
+        });
+    }
+    if let Some(realloc_sym) = obj_file.symbols().find(|s| s.name() == Ok("__COPRO_MAIN_REALLOC")) {
+        let addr = realloc_sym.address() as u32;
+        set_alloc_func.extend(quote!{
+            unsafe { (#addr as *mut fn(ptr: *mut u8, layout: core::alloc::Layout, new_size: usize) -> * mut u8).write_volatile(|ptr, layout, new_size| {
+                unsafe { alloc::realloc(ptr, layout, new_size) }
+            }); }
+        });
+    }
 
     let copy_dest = if let Some(lp_start) = args.lp_start {
         quote! { (#lp_start as *mut u8) }
@@ -478,7 +505,7 @@ pub fn load_lp_code2(input: TokenStream) -> TokenStream {
                     transfer_value : &mut T,
                     #(_: #run_light_sleep_args),*
                 ) -> Result<(), EspCoproError> {
-                    #set_dealloc_func;
+                    #set_alloc_func;
                     try_copro_lock()?;
                     exclusive_execution_start();
                     #alloccall

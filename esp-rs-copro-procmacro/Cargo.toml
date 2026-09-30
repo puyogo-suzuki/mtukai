@@ -31,3 +31,5 @@ esp32c6 = []
 esp32s2 = []
 ## This feature must be enabled when has-lp-core is enabled for ESP32-S3 project.
 esp32s3 = []
+## Parallel execution support.
+parallel-run = []

@@ -178,7 +178,7 @@ impl<T: MovableObject> LPBox<T> {
         if T::IS_ZST {
             LPBox(NonNull::<T>::dangling())
         } else {
-            let ptr = lpalloc::alloc_auto(core::alloc::Layout::new::<T>()) as *mut T;
+            let ptr = lpalloc::alloc_on_me(core::alloc::Layout::new::<T>()) as *mut T;
             ptr.write(value);
             #[cfg(all(feature = "move_on_need", feature = "is-lp-core"))]
             lpalloc::write_vtable(ptr as * mut u8, get_vtable(ptr.as_ref().unwrap()) as * mut u8);
@@ -289,14 +289,13 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
         let addr =
             if let Some(entry) = lpbox_static::remove_by_lp(value as * const T as * const () as usize) {
                 let lay = entry.address.get_layout();
-                if lay == core::alloc::Layout::for_value(value) {
+                if lay == my_layout {
                     entry.address.get_addr() as * mut u8
                 } else {
-                    alloc::dealloc(entry.address.get_addr() as * mut u8, entry.address.get_layout());
-                    lpalloc::alloc_auto(my_layout)
+                    lpalloc::realloc_auto(entry.address.get_addr() as * mut u8, lay, my_layout.size())
                 }
             } else {
-                lpalloc::alloc_auto(my_layout)
+                lpalloc::alloc_on_me(my_layout)
             };
         if addr.is_null() { return Err(EspCoproError::OutOfMemory); }
         value.move_to_main(addr)?;
@@ -407,13 +406,9 @@ impl<T : ?Sized + MovableObject> Drop for LPBox<T>{
     fn drop(&mut self) {
         let ptr = self.0.as_ptr() as * mut u8;
         let lay = unsafe {core::alloc::Layout::for_value(self.0.as_ref())};
-        if lpalloc::in_lp_mem_range(ptr) {
-            unsafe{self.0.drop_in_place();}
-            if lay.size() != 0 {
-                unsafe{alloc::dealloc(ptr, lay);} // lp processor
-            }
-        } else {
-            // do not drop, as it is on the main coprocessor
+        unsafe{self.0.drop_in_place();}
+        if lay.size() != 0 {
+            lpalloc::dealloc_auto(ptr, lay);
         }
     }
 }

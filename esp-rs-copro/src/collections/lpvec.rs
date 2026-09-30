@@ -99,9 +99,9 @@ impl LPVecInner {
         if let Some(new_layout) = Self::layout_array(new_elem_count, elem_layout) {
             let new_ptr = unsafe { 
                 if self.capacity() == 0 {
-                    alloc::alloc(new_layout)
+                    crate::lpalloc::alloc_on_me(new_layout)
                 } else {
-                    alloc::realloc(self.ptr.as_ptr(), self.current_memory(elem_layout), new_layout.size())
+                    crate::lpalloc::realloc_auto(self.ptr.as_ptr(), self.current_memory(elem_layout), new_layout.size())
                 }
             };
             if new_ptr.is_null() {
@@ -1010,14 +1010,13 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
                 crate::lpbox::lpbox_static::remove_by_lp(src as * const [T] as * const () as usize)
                 .map_or_else(|| {
                     let lay = core::alloc::Layout::for_value(src);
-                    lpalloc::alloc_auto(lay) as usize
+                    lpalloc::alloc_on_me(lay) as usize
                 },
                 |a| {
                     let addr = a.address.get_addr();
                     let lay = a.address.get_layout();
                     // Check the layout is unmodified.
                     if lay != core::alloc::Layout::for_value(src) {
-                        // extend the main's.
                         lpalloc::realloc_auto(addr as * mut u8, lay, core::alloc::Layout::for_value(src).size()) as usize
                     } else {
                         addr
