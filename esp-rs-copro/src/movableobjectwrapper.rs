@@ -99,11 +99,15 @@ pub trait MovableObjectWrapFallback {
 #[doc(hidden)]
 impl<T: Copy + ?Sized> MovableObjectWrapFallback for T {
     fn wrap_move_to_main(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> { 
-        unsafe { *(dest as *mut T) = *self; }
+        if !core::ptr::eq(self as *const T as *const u8, dest as *const u8) {
+            unsafe { *(dest as *mut T) = *self; }
+        }
         Ok(())
     }
     fn wrap_move_to_lp(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
-        unsafe { *(dest as *mut T) = *self; }
+        if !core::ptr::eq(self as *const T as *const u8, dest as *const u8) {
+            unsafe { *(dest as *mut T) = *self; }
+        }
         Ok(())
     }
     #[cfg(feature = "has-lp-core")]

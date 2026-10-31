@@ -191,12 +191,16 @@ impl LPLockedState {
 
 impl MovableObject for LPLockedState {
     unsafe fn move_to_main(&self, dest: *mut u8) -> Result<(), EspCoproError> {
-        unsafe { copy_nonoverlapping(self as *const Self as *const u8, dest, core::mem::size_of::<Self>()); }
+        if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
+            unsafe { copy_nonoverlapping(self as *const Self as *const u8, dest, core::mem::size_of::<Self>()); }
+        }
         Ok(())
     }
 
     unsafe fn move_to_lp(&self, dest: *mut u8) -> Result<(), EspCoproError> {
-        unsafe { copy_nonoverlapping(self as *const Self as *const u8, dest, core::mem::size_of::<Self>()); }
+        if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
+            unsafe { copy_nonoverlapping(self as *const Self as *const u8, dest, core::mem::size_of::<Self>()); }
+        }
         Ok(())
     }
 }
@@ -271,12 +275,16 @@ impl<L: RawLock> LPGenericRawMutex<L> {
 // Currently, we do not move `L` and do not require it is [`MovableObject`].
 impl<L: RawLock> MovableObject for LPGenericRawMutex<L> {
     unsafe fn move_to_main(&self, dest: *mut u8) -> Result<(), EspCoproError> {
-        unsafe { copy_nonoverlapping(self as *const Self as *const u8, dest, core::mem::size_of::<Self>()); }
+        if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
+            unsafe { copy_nonoverlapping(self as *const Self as *const u8, dest, core::mem::size_of::<Self>()); }
+        }
         Ok(())
     }
 
     unsafe fn move_to_lp(&self, dest: *mut u8) -> Result<(), EspCoproError> {
-        unsafe { copy_nonoverlapping(self as *const Self as *const u8, dest, core::mem::size_of::<Self>()); }
+        if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
+            unsafe { copy_nonoverlapping(self as *const Self as *const u8, dest, core::mem::size_of::<Self>()); }
+        }
         Ok(())
     }
 }

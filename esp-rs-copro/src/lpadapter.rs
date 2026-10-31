@@ -75,13 +75,17 @@ impl<T: Copy + PartialOrd> PartialOrd<T> for LPAdapter<T> {
 impl<T : Copy> MovableObject for LPAdapter<T> {
     unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
-            ptr::write(dest as *mut LPAdapter<T>, LPAdapter { inner: self.inner });
+            if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
+                ptr::write(dest as *mut LPAdapter<T>, LPAdapter { inner: self.inner });
+            }
         }
         Ok(())
     }
     unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
-            ptr::write(dest as *mut LPAdapter<T>, LPAdapter { inner: self.inner });
+            if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
+                ptr::write(dest as *mut LPAdapter<T>, LPAdapter { inner: self.inner });
+            }
         }
         Ok(())
     }

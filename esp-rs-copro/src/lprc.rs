@@ -660,7 +660,9 @@ impl<T: ?Sized + MovableObject> MovableObject for Inner<T> {
     unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
             let dest = core::ptr::from_raw_parts_mut::<Self>(dest, core::ptr::metadata(self as *const Self));
-            copy_nonoverlapping(self as *const Self as * const Inner<()>, dest as * mut Inner<()>, 1);
+            if self as *const Self as *const () as usize != dest as *mut Self as *mut () as usize {
+                copy_nonoverlapping(self as *const Self as * const Inner<()>, dest as * mut Inner<()>, 1);
+            }
             self.value.move_to_main(&mut (*dest).value as *mut T as *mut u8)
         }
     }
@@ -673,7 +675,9 @@ impl<T: ?Sized + MovableObject> MovableObject for Inner<T> {
     unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
             let dest = core::ptr::from_raw_parts_mut::<Self>(dest, core::ptr::metadata(self as *const Self));
-            copy_nonoverlapping(self as *const Self as * const Inner<()>, dest as * mut Inner<()>, 1);
+            if self as *const Self as *const () as usize != dest as *mut Self as *mut () as usize {
+                copy_nonoverlapping(self as *const Self as * const Inner<()>, dest as * mut Inner<()>, 1);
+            }
             self.value.move_to_lp(&mut (*dest).value as *mut T as *mut u8)
         }
     }
@@ -689,7 +693,9 @@ impl<T: ?Sized + MovableObject> MovableObject for AInner<T> {
     unsafe fn move_to_main(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
             let dest = core::ptr::from_raw_parts_mut::<Self>(dest, core::ptr::metadata(self as *const Self));
-            copy_nonoverlapping(self as *const Self as * const AInner<()>, dest as * mut AInner<()>, 1);
+            if self as *const Self as *const () as usize != dest as *mut Self as *mut () as usize {
+                copy_nonoverlapping(self as *const Self as * const AInner<()>, dest as * mut AInner<()>, 1);
+            }
             self.value.move_to_main(&mut (*dest).value as *mut T as *mut u8)
         }
     }
@@ -702,7 +708,9 @@ impl<T: ?Sized + MovableObject> MovableObject for AInner<T> {
     unsafe fn move_to_lp(&self, dest : *mut u8) -> Result<(), crate::EspCoproError> {
         unsafe {
             let dest = core::ptr::from_raw_parts_mut::<Self>(dest, core::ptr::metadata(self as *const Self));
-            copy_nonoverlapping(self as *const Self as * const AInner<()>, dest as * mut AInner<()>, 1);
+            if self as *const Self as *const () as usize != dest as *mut Self as *mut () as usize {
+                copy_nonoverlapping(self as *const Self as * const AInner<()>, dest as * mut AInner<()>, 1);
+            }
             self.value.move_to_lp(&mut (*dest).value as *mut T as *mut u8)
         }
     }
@@ -713,11 +721,12 @@ impl<T: ?Sized + MovableObject> MovableObject for AInner<T> {
 }
 
 #[cfg(not(feature = "is-lp-core"))]
-fn impl_move_to_main(src: *const u8, layout: Layout) -> Result<(bool, NonNull<u8>), crate::EspCoproError> {
-    let mut must_move = true;
-    let inner = lpbox::lpbox_static::get_by_lp(src as usize, true).and_then(|(ata, copied)|  {
+fn impl_move_to_main(src: *const u8, layout: Layout) -> Result<NonNull<u8>, crate::EspCoproError> {
+    if !lpalloc::in_lp_mem_range(src) {
+        return Ok(unsafe { NonNull::new_unchecked(src as *mut u8) });
+    }
+    let inner = lpbox::lpbox_static::get_by_lp(src as usize, true).and_then(|(ata, _copied)|  {
         if layout == ata.get_layout() {
-            must_move = !copied;
             Some(unsafe{ NonNull::new_unchecked(ata.get_addr() as *mut u8) })
         } else {
             // If the layout doesn't match, we need to allocate a new one
@@ -734,7 +743,7 @@ fn impl_move_to_main(src: *const u8, layout: Layout) -> Result<(bool, NonNull<u8
         lpbox::lpbox_static::insert_no_drop_copied(addr, src  as usize);
         unsafe { NonNull::new_unchecked(addr) }
     };
-    Ok((must_move, inner))
+    Ok(inner)
 }
 
 
@@ -742,12 +751,8 @@ fn impl_move_to_main(src: *const u8, layout: Layout) -> Result<(bool, NonNull<u8
 fn impl_move_to_main_inner<T: ?Sized + MovableObject>(src: &Inner<T>) -> Result<NonNull<Inner<T>>, crate::EspCoproError> {
     let inner_layout = Layout::for_value(src);
     match impl_move_to_main(src as * const Inner<T> as *const u8, inner_layout) {
-        Ok((must_move, res)) => {
-            unsafe {
-                if must_move {
-                    src.move_to_main(res.as_ptr() as * mut u8)?;
-                }
-            }
+        Ok(res) => {
+            unsafe { src.move_to_main(res.as_ptr() as *mut u8)?; }
             Ok(NonNull::from(src).with_addr(res.addr()))
         },
         Err(e) => Err(e)
@@ -758,12 +763,8 @@ fn impl_move_to_main_inner<T: ?Sized + MovableObject>(src: &Inner<T>) -> Result<
 fn impl_move_to_main_ainner<T: ?Sized + MovableObject>(src: &AInner<T>) -> Result<NonNull<AInner<T>>, crate::EspCoproError> {
     let inner_layout = Layout::for_value(src);
     match impl_move_to_main(src as * const AInner<T> as *const u8, inner_layout) {
-        Ok((must_move, res)) => {
-            unsafe {
-                if must_move {
-                    src.move_to_main(res.as_ptr() as * mut u8)?;
-                }
-            }
+        Ok(res) => {
+            unsafe { src.move_to_main(res.as_ptr() as *mut u8)?; }
             Ok(NonNull::from(src).with_addr(res.addr()))
         },
         Err(e) => Err(e)
@@ -772,7 +773,12 @@ fn impl_move_to_main_ainner<T: ?Sized + MovableObject>(src: &AInner<T>) -> Resul
 
 #[cfg(not(feature = "is-lp-core"))]
 fn impl_move_to_lp_inner<T: ?Sized + MovableObject>(src: &Inner<T>) -> Result<NonNull<Inner<T>>, crate::EspCoproError> {
+    if lpalloc::in_lp_mem_range(src as *const Inner<T>) {
+        unsafe { src.value.move_to_lp(core::ptr::addr_of!(src.value) as *mut u8)?; }
+        return Ok(NonNull::from_ref(src));
+    }
     let inner = if let Some(addr) = lpbox::lpbox_static::get_by_main(src as *const Inner<T> as *const () as usize) {
+        unsafe { src.move_to_lp(addr as *mut u8)?; }
         NonNull::from_ref(src).with_addr(unsafe { NonZero::new_unchecked(addr) })
     } else {
         unsafe {
@@ -790,7 +796,12 @@ fn impl_move_to_lp_inner<T: ?Sized + MovableObject>(src: &Inner<T>) -> Result<No
 
 #[cfg(not(feature = "is-lp-core"))]
 fn impl_move_to_lp_ainner<T: ?Sized + MovableObject>(src: &AInner<T>) -> Result<NonNull<AInner<T>>, crate::EspCoproError> {
+    if lpalloc::in_lp_mem_range(src as *const AInner<T>) {
+        unsafe { src.value.move_to_lp(core::ptr::addr_of!(src.value) as *mut u8)?; }
+        return Ok(NonNull::from_ref(src));
+    }
     let inner = if let Some(addr) = lpbox::lpbox_static::get_by_main(src as *const AInner<T> as *const () as usize) {
+        unsafe { src.move_to_lp(addr as *mut u8)?; }
         NonNull::from_ref(src).with_addr(unsafe { NonZero::new_unchecked(addr) })
     } else {
         unsafe {
@@ -812,7 +823,7 @@ impl<T: ?Sized + MovableObject> MovableObject for LPWeak<T> {
         unsafe {
             if crate::is_copy_arcs() {
                 (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_main_inner(self.get_inner())?))
-            } else {
+            } else if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
                 copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
             }
         }
@@ -828,7 +839,7 @@ impl<T: ?Sized + MovableObject> MovableObject for LPWeak<T> {
         unsafe {
             if crate::is_copy_arcs() {
                 (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_lp_inner(self.get_inner())?))
-            } else {
+            } else if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
                 copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
             }
         }
@@ -847,7 +858,7 @@ impl<T: ?Sized + MovableObject> MovableObject for LPAWeak<T> {
         unsafe {
             if crate::is_copy_arcs() {
                 (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_main_ainner(self.get_inner())?))
-            } else {
+            } else if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
                 copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
             }
         }
@@ -863,7 +874,7 @@ impl<T: ?Sized + MovableObject> MovableObject for LPAWeak<T> {
         unsafe {
             if crate::is_copy_arcs() {
                 (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_lp_ainner(self.get_inner())?))
-            } else {
+            } else if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
                 copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
             }
         }
@@ -881,7 +892,7 @@ impl<T: ?Sized + MovableObject> MovableObject for LPRc<T> {
         unsafe {
             if crate::is_copy_arcs() {
                 (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_main_inner(self.get_inner())?))
-            } else {
+            } else if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
                 copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
             }
         }
@@ -897,7 +908,7 @@ impl<T: ?Sized + MovableObject> MovableObject for LPRc<T> {
         unsafe {
             if crate::is_copy_arcs() {
                 (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_lp_inner(self.get_inner())?))
-            } else {
+            } else if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
                 copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
             }
         }
@@ -916,7 +927,7 @@ impl<T: ?Sized + MovableObject> MovableObject for LPArc<T> {
         unsafe {
             if crate::is_copy_arcs() {
                 (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_main_ainner(self.get_inner())?))
-            } else {
+            } else if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
                 copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
             }
         }
@@ -932,7 +943,7 @@ impl<T: ?Sized + MovableObject> MovableObject for LPArc<T> {
         unsafe {
             if crate::is_copy_arcs() {
                 (dest as *mut Self).write_volatile(Self::from_inner(impl_move_to_lp_ainner(self.get_inner())?))
-            } else {
+            } else if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
                 copy_nonoverlapping(self as *const Self, dest as *mut Self, 1);
             }
         }
@@ -943,4 +954,3 @@ impl<T: ?Sized + MovableObject> MovableObject for LPArc<T> {
         Err(EspCoproError::NotAllowed)
     }
 }
-

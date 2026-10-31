@@ -88,12 +88,16 @@ impl MovableObject for () {
 // We only support MaybeUninit of Copy types, because otherwise we would need to move the value out of the MaybeUninit in order to move it, which would prevent us from leaving the original MaybeUninit uninitialized in the case where the value is not actually initialized.
 impl<T : MovableObject + Copy> MovableObject for MaybeUninit<T> {
     unsafe fn move_to_main(&self, dest: *mut u8) -> Result<(), EspCoproError> {
-        unsafe { copy_nonoverlapping(self as * const Self, dest as * mut Self, 1); }
+        if !core::ptr::eq(self as *const MaybeUninit<T> as *const u8, dest as *const u8) {
+            unsafe { copy_nonoverlapping(self as * const Self, dest as * mut Self, 1); }
+        }
         Ok(())
     }
 
     unsafe fn move_to_lp(&self, dest: *mut u8) -> Result<(), EspCoproError> {
-        unsafe { copy_nonoverlapping(self as * const Self, dest as * mut Self, 1); }
+        if !core::ptr::eq(self as *const MaybeUninit<T> as *const u8, dest as *const u8) {
+            unsafe { copy_nonoverlapping(self as * const Self, dest as * mut Self, 1); }
+        }
         Ok(())
     }
 }
@@ -102,11 +106,15 @@ macro_rules! impl_movable_object_for_containers {
     ($ti:ident, $t:ty, $t2:path) => {
         impl<$ti: $t2> MovableObject for $t {
             unsafe fn move_to_main(&self, dest: *mut u8) -> Result<(), EspCoproError> {
-                unsafe { copy_nonoverlapping(self as * const Self, dest as * mut Self, 1); }
+                if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
+                    unsafe { copy_nonoverlapping(self as * const Self, dest as * mut Self, 1); }
+                }
                 Ok(())
             }
             unsafe fn move_to_lp(&self, dest: *mut u8) -> Result<(), EspCoproError> {
-                unsafe { copy_nonoverlapping(self as * const Self, dest as * mut Self, 1); }
+                if !core::ptr::eq(self as *const Self as *const u8, dest as *const u8) {
+                    unsafe { copy_nonoverlapping(self as * const Self, dest as * mut Self, 1); }
+                }
                 Ok(())
             }
         }

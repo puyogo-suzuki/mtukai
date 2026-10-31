@@ -265,8 +265,14 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
     /// TODO: Must be moved to the other implementation. This is because Box<T> is single-owner, thus it is not possible that the pointee has already moved.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub(crate) fn write_to_lp(value : &T) -> Result<NonNull<T>, EspCoproError> { unsafe {
+        let value_ptr = value as *const T;
+        if lpalloc::in_lp_mem_range(value_ptr) {
+            value.move_to_lp(value_ptr as *mut u8)?;
+            return Ok(NonNull::from_ref(value));
+        }
         if let Some(existing_lp_addr) = 
             lpbox_static::get_by_main(value as *const T as * const () as usize) {
+            value.move_to_lp(existing_lp_addr as *mut u8)?;
             return Ok(NonNull::from_ref(value).with_addr(NonZero::new_unchecked(existing_lp_addr as usize)));
         }
         let ptr: *mut u8 = lpalloc::lp_allocator_alloc(core::alloc::Layout::for_value(value)) as * mut u8;
@@ -282,9 +288,14 @@ impl<T: ?Sized + MovableObject> LPBox<T> {
 
     /// This is for internal-use.
     /// Returns a reference to the value. The value is moved to the main memory.
-    /// If the value is already in the main memory, the value on the main memory is overwritten.
+    /// If the value is already in the main memory, its existing allocation is reused.
     #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
     pub(crate) fn write_to_main(value : &T) -> Result<NonNull<T>, EspCoproError> { unsafe {
+        let value_ptr = value as *const T;
+        if !lpalloc::in_lp_mem_range(value_ptr) {
+            value.move_to_main(value_ptr as *mut u8)?;
+            return Ok(NonNull::from_ref(value));
+        }
         let my_layout = core::alloc::Layout::for_value(value);
         let addr =
             if let Some(entry) = lpbox_static::remove_by_lp(value as * const T as * const () as usize) {

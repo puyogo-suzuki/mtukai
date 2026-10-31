@@ -1006,24 +1006,26 @@ impl<T : MovableObject> MovableObject for LPVec<T> {
         let dest = dest as * mut Self;
         let dst_ptr = unsafe {
             let src = self.as_slice();
-            let addr =
-                crate::lpbox::lpbox_static::remove_by_lp(src as * const [T] as * const () as usize)
-                .map_or_else(|| {
-                    let lay = core::alloc::Layout::for_value(src);
-                    lpalloc::alloc_on_me(lay) as usize
-                },
-                |a| {
-                    let addr = a.address.get_addr();
-                    let lay = a.address.get_layout();
-                    // Check the layout is unmodified.
-                    if lay != core::alloc::Layout::for_value(src) {
-                        lpalloc::realloc_auto(addr as * mut u8, lay, core::alloc::Layout::for_value(src).size()) as usize
-                    } else {
-                        addr
-                    }
-                });
-            src.move_to_main(addr as * mut u8)?;
-            addr as * mut u8
+            let addr = if !lpalloc::in_lp_mem_range(src.as_ptr()) {
+                src.as_ptr() as *mut u8 as usize
+            } else {
+                crate::lpbox::lpbox_static::remove_by_lp(src as *const [T] as *const () as usize)
+                    .map_or_else(|| {
+                        let lay = core::alloc::Layout::for_value(src);
+                        lpalloc::alloc_on_me(lay) as usize
+                    },
+                    |a| {
+                        let addr = a.address.get_addr();
+                        let lay = a.address.get_layout();
+                        if lay != core::alloc::Layout::for_value(src) {
+                            lpalloc::realloc_auto(addr as *mut u8, lay, core::alloc::Layout::for_value(src).size()) as usize
+                        } else {
+                            addr
+                        }
+                    })
+            };
+            src.move_to_main(addr as *mut u8)?;
+            addr as *mut u8
         };
         unsafe {
             dest.write_volatile(LPVec {
