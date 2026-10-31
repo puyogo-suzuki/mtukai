@@ -50,8 +50,8 @@ pub fn esp_rs_copro_statics(_attr: TokenStream) -> TokenStream {
     let deallocfunc = if cfg!(all(feature = "esp32c6", feature = "parallel-run")) {
         quote! {
         #[unsafe(export_name="__COPRO_MAIN_ALLOC")]
-        static mut MAIN_ALLOC_FUNC : fn(layout: core::alloc::Layout) -> * mut u8 = |_, _| {};
-        pub extern "Rust" fn __lpcoproc_main_alloc(layout: core::alloc::Layout) {
+        static mut MAIN_ALLOC_FUNC : fn(layout: core::alloc::Layout) -> * mut u8 = |_| core::ptr::null_mut();
+        pub extern "Rust" fn __lpcoproc_main_alloc(layout: core::alloc::Layout) -> *mut u8 {
             unsafe { MAIN_ALLOC_FUNC(layout) }
         }
         #[unsafe(export_name="__COPRO_MAIN_DEALLOC")]
@@ -60,9 +60,9 @@ pub fn esp_rs_copro_statics(_attr: TokenStream) -> TokenStream {
             unsafe { MAIN_DEALLOC_FUNC(ptr, layout); }
         }
         #[unsafe(export_name="__COPRO_MAIN_REALLOC")]
-        static mut MAIN_REALLOC_FUNC : fn(ptr: *mut u8, layout: core::alloc::Layout) -> * mut u8 = |_, _| {};
-        pub extern "Rust" fn __lpcoproc_main_realloc(ptr: * mut u8, layout: core::alloc::Layout) {
-            unsafe { MAIN_REALLOC_FUNC(ptr, layout) }
+        static mut MAIN_REALLOC_FUNC : fn(ptr: *mut u8, layout: core::alloc::Layout, new_size: usize) -> *mut u8 = |_, _, _| core::ptr::null_mut();
+        pub extern "Rust" fn __lpcoproc_main_realloc( ptr: *mut u8, layout: core::alloc::Layout, new_size: usize) -> *mut u8 {
+            unsafe { MAIN_REALLOC_FUNC(ptr, layout, new_size) }
         }
         }
     } else { quote!{} };

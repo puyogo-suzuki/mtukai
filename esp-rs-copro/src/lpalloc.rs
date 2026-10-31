@@ -13,7 +13,7 @@ unsafe extern "Rust" {
     #[link_name = "__lpcoproc_main_realloc"]
     pub(crate) fn main_realloc(ptr: * mut u8, old_layout: Layout, new_size : usize) -> * mut u8;
     #[link_name = "__lpcoproc_main_alloc"]
-    pub(crate) fn main_alloc(ptr: * mut u8, layout: Layout) -> * mut u8;
+    pub(crate) fn main_alloc(layout: Layout) -> * mut u8;
 }
 
 #[cfg(any(feature = "has-lp-core", not(feature = "nottest")))]
@@ -61,7 +61,7 @@ pub(crate) fn alloc_on_me(l : core::alloc::Layout) -> *mut u8 {
 pub(crate) fn realloc_auto(ptr : * mut u8, old_layout : core::alloc::Layout, new_size : usize) -> * mut u8 {
     unsafe {
         #[cfg(feature = "parallel-run")]
-        let ptr = if in_lp_mem_range(parent_pointer) {
+        let new_ptr = if in_lp_mem_range(ptr) {
             alloc::realloc(ptr, old_layout, new_size)
         } else {
             main_realloc(ptr, old_layout, new_size)
